@@ -435,22 +435,20 @@ ShellRoot {
         property var toast: NotifState.activeToast
 
         onToastChanged: {
-          if (toast !== null) {
-            var t = toast.expireTimeout
-            toastTimer.interval = (t > 0 && t < 60000) ? t : 5000
+          if (toast !== null)
             toastTimer.restart()
-          } else {
+          else
             toastTimer.stop()
-          }
         }
 
+        // Every toast shows for a few seconds, then auto-dismisses off-screen.
+        // popToast only drops it from the on-screen queue — it stays in the
+        // notification center until the user clears it. Applies to all
+        // urgencies (incl. Critical), so nothing gets stuck on screen.
         Timer {
           id: toastTimer
-          onTriggered: {
-            if (NotifState.activeToast
-                && NotifState.activeToast.urgency !== NotificationUrgency.Critical)
-              NotifState.popToast()
-          }
+          interval: 5000
+          onTriggered: NotifState.popToast()
         }
 
         PopupFrame {
@@ -462,6 +460,9 @@ ShellRoot {
           width: 420
           implicitHeight: toastInner.implicitHeight + 20
           radius: Theme.windowRadius
+          // Green frame matching Omarchy's active-window border (col.active_border).
+          border.color: Theme.accent
+          border.width: 2
 
           Column {
             id: toastInner
