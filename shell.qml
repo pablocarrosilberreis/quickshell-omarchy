@@ -447,7 +447,7 @@ ShellRoot {
         // urgencies (incl. Critical), so nothing gets stuck on screen.
         Timer {
           id: toastTimer
-          interval: 5000
+          interval: 3000
           onTriggered: NotifState.popToast()
         }
 
