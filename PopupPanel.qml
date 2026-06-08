@@ -26,14 +26,15 @@ PanelWindow {
   property int popupWidth: 300
   property string ns: "quickshell-popup"
   property int popupKeyboardFocus: WlrKeyboardFocus.None
-  property real frameRadius: 12
+  property real frameRadius: Theme.windowRadius
   property int bottomPadding: 10
   signal dismissed()
 
   // Content is added to the frame (its parent is the frame).
   default property alias content: frame.data
 
-  visible: root.shown
+  // Keep the window alive until the frame's close animation finishes.
+  visible: frame.active
   anchors { top: true; bottom: true; left: true; right: true }
   color: "transparent"
   exclusiveZone: -1

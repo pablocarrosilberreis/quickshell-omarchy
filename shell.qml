@@ -42,7 +42,7 @@ ShellRoot {
         required property var modelData
         screen: modelData
 
-        visible: MediaPlayerState.popupVisible && MediaPlayerState.active
+        visible: mediaPopupContent.active
         anchors { top: true; bottom: true; left: true; right: true }
         color: "transparent"
         exclusiveZone: -1
@@ -61,7 +61,7 @@ ShellRoot {
           y: 4
           width: 380
           implicitHeight: popupColumn.implicitHeight + 30
-          radius: 10
+          radius: Theme.windowRadius
           border.color: Qt.lighter(Theme.background, 1.5)
 
           HoverHandler {
@@ -379,7 +379,7 @@ ShellRoot {
         required property var modelData
         screen: modelData
 
-        visible: CalendarState.visible
+        visible: calFrame.active
         anchors { top: true; bottom: true; left: true; right: true }
         color: "transparent"
         exclusiveZone: -1
@@ -400,7 +400,7 @@ ShellRoot {
           y: 4
           implicitWidth: calContent.implicitWidth + 36
           implicitHeight: calContent.implicitHeight + 36
-          radius: 16
+          radius: Theme.windowRadius
 
           CalendarPopup {
             id: calContent
@@ -424,7 +424,7 @@ ShellRoot {
         required property var modelData
         screen: modelData
 
-        visible: NotifState.activeToast !== null
+        visible: toastRect.active
         anchors { top: true; bottom: true; left: true; right: true }
         color: "transparent"
         exclusiveZone: -1
@@ -462,7 +462,7 @@ ShellRoot {
           y: 4
           width: 420
           implicitHeight: toastInner.implicitHeight + 20
-          radius: 12
+          radius: Theme.windowRadius
 
           Column {
             id: toastInner
