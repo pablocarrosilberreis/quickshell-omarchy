@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Returns JSON with current conditions + 3-day forecast from wttr.in.
+# Falls back to cached result if the network is not yet available.
+
+CACHE="$HOME/.cache/omarchy/weather-forecast.json"
+
+data=$(curl -fsS --max-time 6 "https://wttr.in?format=j1" 2>/dev/null)
+
+if [[ -z "$data" ]]; then
+  [[ -f "$CACHE" ]] && cat "$CACHE" || echo '{}'
+  exit 0
+fi
+
+result=$(echo "$data" | python3 -c '
+import json, sys, datetime
+
+d = json.load(sys.stdin)
+
+def day_name(date_str):
+    dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+    return dt.strftime("%a")
+
+cur = d["current_condition"][0]
+days = d["weather"][:3]
+
+out = {
+    "current": {
+        "temp":      cur["temp_C"],
+        "feelsLike": cur["FeelsLikeC"],
+        "desc":      cur["weatherDesc"][0]["value"],
+        "humidity":  cur["humidity"],
+        "wind":      cur["windspeedKmph"],
+        "windDir":   cur["winddir16Point"],
+        "code":      int(cur["weatherCode"])
+    },
+    "days": [
+        {
+            "dayName": day_name(day["date"]),
+            "max":     day["maxtempC"],
+            "min":     day["mintempC"],
+            "desc":    day["hourly"][4]["weatherDesc"][0]["value"],
+            "code":    int(day["hourly"][4]["weatherCode"])
+        }
+        for day in days
+    ]
+}
+print(json.dumps(out))
+')
+
+if [[ -n "$result" ]]; then
+  printf '%s\n' "$result" | tee "$CACHE"
+else
+  echo '{}'
+fi

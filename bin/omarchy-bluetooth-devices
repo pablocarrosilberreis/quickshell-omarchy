@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Outputs JSON: { powered, devices[] } where devices are only paired/trusted/connected.
+# NEARBY devices come exclusively from btMonitor scan events in BluetoothState.qml.
+
+powered=$(bluetoothctl show 2>/dev/null | awk '/Powered:/{print ($2=="yes") ? "true" : "false"}')
+powered=${powered:-false}
+
+if [[ "$powered" == "false" ]]; then
+  paired_json="["; first=true
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    mac=$(echo "$line" | awk '{print $2}')
+    [[ -z "$mac" ]] && continue
+    name=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s%s",$i,(i<NF?" ":""); print ""}')
+    name_json=$(jq -n --arg n "$name" '$n')
+    $first || paired_json+=","
+    first=false
+    paired_json+="{\"mac\":\"$mac\",\"name\":$name_json,\"connected\":false,\"paired\":true}"
+  done <<< "$(bluetoothctl devices Paired 2>/dev/null)"
+  paired_json+="]"
+  printf '{"powered":false,"devices":%s}\n' "$paired_json"; exit 0
+fi
+
+# Get connected MACs
+connected_macs=$(bluetoothctl devices Connected 2>/dev/null | awk '{print $2}')
+
+# Collect all "known" devices: Paired + Trusted + Connected (deduplicated)
+all_raw=$(
+  bluetoothctl devices Paired    2>/dev/null
+  bluetoothctl devices Trusted   2>/dev/null
+  bluetoothctl devices Connected 2>/dev/null
+)
+
+declare -A seen
+first=true
+devices_json="["
+
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  mac=$(echo "$line" | awk '{print $2}')
+  [[ -z "$mac" || -n "${seen[$mac]}" ]] && continue
+  seen[$mac]=1
+  name=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s%s",$i,(i<NF?" ":""); print ""}')
+  is_connected=false
+  echo "$connected_macs" | grep -qx "$mac" && is_connected=true
+  name_json=$(jq -n --arg n "$name" '$n')
+  $first || devices_json+=","
+  first=false
+  devices_json+="{\"mac\":\"$mac\",\"name\":$name_json,\"connected\":$is_connected,\"paired\":true}"
+done <<< "$all_raw"
+
+devices_json+="]"
+echo "{\"powered\":$powered,\"devices\":$devices_json}"

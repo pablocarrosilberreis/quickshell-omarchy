@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+CODE="$1"
+[[ -z "$CODE" ]] && exit 1
+FILE="$HOME/.config/hypr/input.lua"
+
+if [ "$CODE" = "us" ]; then
+    # Switch to US without touching the config file. Writing "us" to the file
+    # while "us,es" is live triggers an inotify reload that shrinks 2→1 layouts,
+    # which crashes Hyprland. The file keeps "us,es"; on next start index 0 = "us".
+    hyprctl switchxkblayout all 0
+else
+    NEW="us,$CODE"
+    sed -i "s|kb_layout = \"[^\"]*\"|kb_layout = \"$NEW\"|" "$FILE"
+    hyprctl keyword input:kb_layout "$NEW"
+    hyprctl switchxkblayout all 1
+fi

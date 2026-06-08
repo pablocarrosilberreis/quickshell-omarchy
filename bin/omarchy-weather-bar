@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Returns {"text":"temp° icon"} for the QuickShell bar weather widget.
+# Fetches icon and temperature in parallel to avoid double latency.
+# Falls back to cached result if the network is not yet available.
+
+CACHE="$HOME/.cache/omarchy/weather-bar.json"
+
+icon_file=$(mktemp)
+temp_file=$(mktemp)
+
+omarchy-weather-icon >"$icon_file" 2>/dev/null &
+curl -fsS --max-time 3 "https://wttr.in?format=%t" >"$temp_file" 2>/dev/null &
+wait
+
+icon=$(<"$icon_file")
+temp=$(tr -d '+\n' <"$temp_file")
+rm -f "$icon_file" "$temp_file"
+
+if [[ -z $icon ]]; then
+  # Network not ready yet — return cached result if available
+  if [[ -f $CACHE ]]; then
+    cat "$CACHE"
+  else
+    printf '{"text":""}\n'
+  fi
+  exit 0
+fi
+
+icon=$(printf '%s' "$icon" | sed 's/["\\]/\\&/g')
+temp=$(printf '%s' "$temp" | sed 's/C$//')
+result=$(printf '{"text":"%s %s"}\n' "$temp" "$icon")
+
+printf '%s\n' "$result"
+printf '%s\n' "$result" > "$CACHE"

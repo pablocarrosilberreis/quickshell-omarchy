@@ -1,0 +1,18 @@
+#!/bin/bash
+ds=$(pactl get-default-sink 2>/dev/null)
+di=$(pactl get-default-source 2>/dev/null)
+
+sinks_file=$(mktemp)
+sources_file=$(mktemp)
+pactl --format=json list sinks   >"$sinks_file"   2>/dev/null &
+pactl --format=json list sources >"$sources_file" 2>/dev/null &
+wait
+
+sinks=$(jq -c --arg d "$ds" \
+  '[.[]|{name:.name,desc:.description,active:(.name==$d)}]' "$sinks_file")
+sources=$(jq -c --arg d "$di" \
+  '[.[]|select(.name|test("\\.monitor$")|not)|{name:.name,desc:.description,active:(.name==$d)}]' \
+  "$sources_file")
+
+rm -f "$sinks_file" "$sources_file"
+printf '{"sinks":%s,"sources":%s}\n' "$sinks" "$sources"

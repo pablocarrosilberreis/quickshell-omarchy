@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+# Outputs JSON array of active sink inputs: [{index, name, vol}, ...]
+import subprocess, re, json
+
+def run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True).stdout
+
+# Maps process binary names to display names.
+BINARY_NAMES = {
+    "steamwebhelper": "Steam",
+    "steam":          "Steam",
+    "zen-bin":        "Zen",
+    "firefox-bin":    "Firefox",
+    "chromium":       "Chromium",
+    "discord":        "Discord",
+    "slack":          "Slack",
+    "teams":          "Teams",
+}
+
+# app.name values that are too generic to trust over the binary name
+GENERIC_NAMES = {"chromium", "electron", "chrome", "brave", "opera", "vivaldi"}
+
+def proc_name(pid):
+    try:
+        n = run(["ps", "-p", pid, "-o", "comm="]).strip()
+        return n.capitalize() if n else ""
+    except Exception:
+        return ""
+
+# Build client-id → process-name map from pactl list clients
+client_names = {}
+clients_text = run(["pactl", "list", "clients"])
+for block in re.split(r"(?=^Client #)", clients_text, flags=re.MULTILINE):
+    m = re.search(r"Client #(\d+)", block)
+    if not m:
+        continue
+    cid = m.group(1)
+    # prefer application.name in client properties
+    nm = re.search(r'application\.name = "(.+?)"', block)
+    if nm:
+        client_names[cid] = nm.group(1)
+        continue
+    pid_m = re.search(r'pipewire\.sec\.pid = "(\d+)"', block)
+    if pid_m:
+        name = proc_name(pid_m.group(1))
+        if name:
+            client_names[cid] = name
+
+# Master volume from default sink
+master_vol_text  = run(["pactl", "get-sink-volume", "@DEFAULT_SINK@"])
+master_mute_text = run(["pactl", "get-sink-mute",   "@DEFAULT_SINK@"])
+mv = re.search(r"(\d+)%", master_vol_text)
+master = {
+    "vol":   int(mv.group(1)) if mv else 100,
+    "muted": "yes" in master_mute_text,
+}
+
+results = []
+sink_text = run(["pactl", "list", "sink-inputs"])
+for block in re.split(r"(?=^Sink Input #)", sink_text, flags=re.MULTILINE):
+    idx_m = re.search(r"Sink Input #(\d+)", block)
+    if not idx_m:
+        continue
+    index = int(idx_m.group(1))
+
+    vol_m = re.search(r"(\d+)%", block)
+    vol = int(vol_m.group(1)) if vol_m else 0
+
+    mute_m = re.search(r"^\s*Mute:\s*(\S+)", block, re.MULTILINE)
+    muted = mute_m.group(1) == "yes" if mute_m else False
+
+    # Collect both name sources
+    app_nm  = re.search(r'application\.name = "(.+?)"', block)
+    bin_nm  = re.search(r'application\.process\.binary = "(.+?)"', block)
+    app_name = app_nm.group(1) if app_nm else ""
+    bin_name = bin_nm.group(1) if bin_nm else ""
+
+    # Prefer binary mapping; fall back to app.name unless it's generic
+    if bin_name and bin_name.lower() in BINARY_NAMES:
+        name = BINARY_NAMES[bin_name.lower()]
+    elif app_name and app_name.lower() not in GENERIC_NAMES:
+        name = app_name
+    elif bin_name:
+        name = BINARY_NAMES.get(bin_name.lower(), bin_name)
+    else:
+        cid_m = re.search(r"^\s*Client:\s*(\S+)", block, re.MULTILINE)
+        cid = cid_m.group(1) if cid_m else None
+        name = (client_names.get(cid) if cid else None) or ""
+        if not name:
+            nn = re.search(r'node\.name = "(.+?)"', block)
+            name = nn.group(1) if nn else "App"
+
+    results.append({"index": index, "name": name.capitalize(), "vol": vol, "muted": muted})
+
+merged = {}
+for s in results:
+    n = s["name"]
+    if n not in merged:
+        merged[n] = {"indices": [s["index"]], "name": n, "vol": s["vol"], "muted": s["muted"]}
+    else:
+        merged[n]["indices"].append(s["index"])
+
+print(json.dumps({"master": master, "streams": list(merged.values())}))

@@ -1,0 +1,4 @@
+# Runtime / cache
+*.qmlc
+*.jsc
+.cache/

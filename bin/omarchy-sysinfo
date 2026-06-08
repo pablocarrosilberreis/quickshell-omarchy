@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+# System resources for the QuickShell bar (JSON on stdout).
+#   omarchy-sysinfo            full snapshot (CPU/RAM/GPU/VRAM + all temps)
+#   omarchy-sysinfo --light    bar-only subset (CPU/RAM + CPU temp); skips the
+#                              GPU sysfs walk and GPU/NVMe temps.
+# Temperatures are read straight from hwmon sysfs (no `sensors` subprocess).
+import json, time, os, re, sys, glob
+
+LIGHT = "--light" in sys.argv[1:]
+
+
+def read_cpu_stat():
+    with open('/proc/stat') as f:
+        vals = list(map(int, f.readline().split()[1:]))
+    return vals[3] + vals[4], sum(vals)
+
+
+i1, t1 = read_cpu_stat()
+time.sleep(0.25)
+i2, t2 = read_cpu_stat()
+dt = t2 - t1
+cpu_pct = round(100 * (1 - (i2 - i1) / dt)) if dt else 0
+
+# RAM (kB from /proc/meminfo)
+mem = {}
+with open('/proc/meminfo') as f:
+    for line in f:
+        k, v = line.split(':', 1)
+        mem[k.strip()] = int(v.split()[0])
+mem_used = mem['MemTotal'] - mem['MemAvailable']
+mem_pct = round(100 * mem_used / mem['MemTotal'])
+mem_used_gb = round(mem_used / 1048576, 1)
+mem_total_gb = round(mem['MemTotal'] / 1048576, 1)
+
+
+def temp_by_label(hwmon_dir, want_label):
+    """Return temp in °C from a hwmon dir whose temp*_label matches want_label."""
+    for lbl in glob.glob(os.path.join(hwmon_dir, 'temp*_label')):
+        try:
+            if open(lbl).read().strip() == want_label:
+                inp = lbl.replace('_label', '_input')
+                return round(int(open(inp).read().strip()) / 1000)
+        except OSError:
+            pass
+    return None
+
+
+def hwmon_temp(name, want_label):
+    """Find the first /sys/class/hwmon entry named `name` and read want_label.
+    hwmon numbering is not stable across boots, so match on the name file."""
+    for hw in glob.glob('/sys/class/hwmon/hwmon*'):
+        try:
+            if open(os.path.join(hw, 'name')).read().strip() != name:
+                continue
+        except OSError:
+            continue
+        t = temp_by_label(hw, want_label)
+        if t is not None:
+            return t
+    return None
+
+
+# CPU temperature (k10temp Tctl) — shown in the bar, so always read it.
+cpu_temp = hwmon_temp('k10temp', 'Tctl')
+
+gpu_pct = gpu_vram_used = gpu_vram_total = gpu_temp = nvme_temp = None
+
+if not LIGHT:
+    # Dedicated GPU = card with highest VRAM
+    best_vram = 0
+    gpu_base = None
+    for card in sorted(c for c in os.listdir('/sys/class/drm') if re.match(r'^card\d+$', c)):
+        base = f'/sys/class/drm/{card}/device'
+        vt_path = f'{base}/mem_info_vram_total'
+        if not os.path.exists(vt_path):
+            continue
+        try:
+            vt = int(open(vt_path).read())
+            if vt > best_vram:
+                best_vram = vt
+                gpu_base = base
+                gpu_pct = int(open(f'{base}/gpu_busy_percent').read().strip())
+                vu = int(open(f'{base}/mem_info_vram_used').read().strip())
+                gpu_vram_used = round(vu / 1073741824, 1)
+                gpu_vram_total = round(vt / 1073741824, 1)
+        except OSError:
+            pass
+
+    # GPU temperature (edge) from the selected card's own hwmon node
+    if gpu_base:
+        for hw in glob.glob(f'{gpu_base}/hwmon/hwmon*'):
+            t = temp_by_label(hw, 'edge')
+            if t is not None:
+                gpu_temp = t
+                break
+
+    # NVMe temperature (Composite)
+    nvme_temp = hwmon_temp('nvme', 'Composite')
+
+print(json.dumps({
+    'cpu': cpu_pct,
+    'ram_pct': mem_pct,
+    'ram_used': mem_used_gb,
+    'ram_total': mem_total_gb,
+    'gpu': gpu_pct,
+    'gpu_vram_used': gpu_vram_used,
+    'gpu_vram_total': gpu_vram_total,
+    'cpu_temp': cpu_temp,
+    'gpu_temp': gpu_temp,
+    'nvme_temp': nvme_temp,
+}))

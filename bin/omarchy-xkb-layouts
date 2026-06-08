@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Wrapper: compact single-line JSON so QuickShell's Poll.onUpdated gets the full output
+awk '/^! layout/{found=1; next} /^!/{found=0} found && /^  [a-z]/' \
+  /usr/share/X11/xkb/rules/evdev.lst | \
+  while IFS= read -r line; do
+    code=$(echo "$line" | awk '{print $1}')
+    name=$(echo "$line" | awk '{$1=""; sub(/^ +/, ""); print}')
+    name_json=$(jq -n --arg n "$name" '$n')
+    echo "{\"code\":\"$code\",\"name\":$name_json}"
+  done | jq -sc '.'

@@ -1,0 +1,7 @@
+#!/bin/bash
+# Start BT discovery in interactive bluetoothctl (non-interactive mode
+# doesn't set Discovering: yes on this hardware).
+# Saves PID so it can be killed cleanly; trap stops discovery on exit.
+echo $$ > /tmp/omarchy-bt-scan.pid
+trap 'rm -f /tmp/omarchy-bt-scan.pid; bluetoothctl scan off 2>/dev/null' EXIT TERM INT
+{ printf 'scan on\n'; sleep infinity; } | bluetoothctl

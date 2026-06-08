@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+# Outputs JSON: {"enabled":bool,"iface":str,"networks":[{ssid,signal,secured,connected,saved}]}
+import subprocess, json
+
+def run(cmd):
+    try:
+        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
+    except Exception:
+        return ""
+
+# Radio state
+enabled = run(["nmcli", "radio", "wifi"]).strip() == "enabled"
+
+# Wifi interface
+iface = ""
+for line in run(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "device", "status"]).splitlines():
+    parts = line.split(":")
+    if len(parts) >= 2 and parts[1] == "wifi":
+        iface = parts[0]
+        break
+
+# Saved wifi profiles
+saved = set()
+for line in run(["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"]).splitlines():
+    if ":802-11-wireless" in line:
+        saved.add(line.rsplit(":", 1)[0])
+
+# Network list — terse colon-separated: IN-USE:SSID:SIGNAL:SECURITY
+# SSID may contain colons, so split from both ends
+nets = []
+seen = set()
+for line in run(["nmcli", "--terse", "-f", "IN-USE,SSID,SIGNAL,SECURITY",
+                 "device", "wifi", "list"]).splitlines():
+    parts = line.split(":")
+    if len(parts) < 3:
+        continue
+    inuse    = parts[0]
+    security = parts[-1]
+    sig_str  = parts[-2]
+    ssid     = ":".join(parts[1:-2])
+    if not ssid or ssid in seen:
+        continue
+    seen.add(ssid)
+    try:
+        sig = int(sig_str)
+    except ValueError:
+        continue
+    nets.append({
+        "ssid":      ssid,
+        "signal":    sig,
+        "secured":   bool(security),
+        "connected": inuse == "*",
+        "saved":     ssid in saved,
+    })
+
+nets.sort(key=lambda x: -x["signal"])
+print(json.dumps({"enabled": enabled, "iface": iface, "networks": nets}))
