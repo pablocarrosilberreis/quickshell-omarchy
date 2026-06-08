@@ -7,7 +7,9 @@ Item {
   id: root
   implicitWidth: 380
   implicitHeight: headerRow.implicitHeight
-    + (hasNotifs ? Math.min(listCol.implicitHeight, 220) + 8 : emptyText.implicitHeight + 8)
+    + (hasNotifs
+        ? clearBtn.implicitHeight + 4 + Math.min(listCol.implicitHeight, 220) + 8
+        : emptyText.implicitHeight + 8)
 
   readonly property bool hasNotifs: NotifState.notifications.length > 0
 
@@ -26,26 +28,10 @@ Item {
       renderType: Text.NativeRendering
     }
 
-    // "Clear all" button
-    Text {
-      id: clearBtn
-      anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-      visible: root.hasNotifs
-      text: "Clear all"
-      font.family: Theme.font; font.pixelSize: 11
-      color: Theme.foreground; opacity: 0.4
-      renderType: Text.NativeRendering
-      MouseArea {
-        anchors.fill: parent
-        cursorShape: Qt.PointingHandCursor
-        onClicked: NotifState.clearAll()
-      }
-    }
-
-    // DND toggle slider
+    // DND toggle slider (top-right)
     Item {
       id: dndToggle
-      anchors { right: clearBtn.visible ? clearBtn.left : parent.right; rightMargin: clearBtn.visible ? 10 : 0; verticalCenter: parent.verticalCenter }
+      anchors { right: parent.right; verticalCenter: parent.verticalCenter }
       width: 28; height: 16
 
       Rectangle {
@@ -84,6 +70,22 @@ Item {
     }
   }
 
+  // "Clear all" — on its own line below the bell icon + DND slider.
+  Text {
+    id: clearBtn
+    visible: root.hasNotifs
+    anchors { top: headerRow.bottom; topMargin: 4; right: parent.right }
+    text: "Clear all"
+    font.family: Theme.font; font.pixelSize: 11
+    color: Theme.foreground; opacity: 0.4
+    renderType: Text.NativeRendering
+    MouseArea {
+      anchors.fill: parent
+      cursorShape: Qt.PointingHandCursor
+      onClicked: NotifState.clearAll()
+    }
+  }
+
   // ── Empty state ─────────────────────────────────────────────────────────
   Text {
     id: emptyText
@@ -98,7 +100,7 @@ Item {
   // ── List ─────────────────────────────────────────────────────────────────
   Item {
     visible: root.hasNotifs
-    anchors { top: headerRow.bottom; topMargin: 8; left: parent.left; right: parent.right }
+    anchors { top: clearBtn.bottom; topMargin: 8; left: parent.left; right: parent.right }
     height: Math.min(listCol.implicitHeight, 220)
     clip: true
 
