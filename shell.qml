@@ -58,7 +58,7 @@ ShellRoot {
           x: Math.max(4, Math.min(
             MediaPlayerState.anchorX + MediaPlayerState.anchorW / 2 - 190,
             modelData.width - 380 - 4))
-          y: 4
+          y: Theme.popupGap
           width: 380
           implicitHeight: popupColumn.implicitHeight + 30
           radius: Theme.windowRadius
@@ -396,7 +396,7 @@ ShellRoot {
           x: Math.max(4, Math.min(
             CalendarState.anchorX + CalendarState.anchorW / 2 - calFrame.implicitWidth / 2,
             modelData.width - calFrame.implicitWidth - 4))
-          y: 4
+          y: Theme.popupGap
           implicitWidth: calContent.implicitWidth + 36
           implicitHeight: calContent.implicitHeight + 36
           radius: Theme.windowRadius
@@ -456,7 +456,7 @@ ShellRoot {
           popupVisible: NotifState.activeToast !== null
           z: 1
           x: Math.round((modelData.width - 420) / 2)
-          y: 4
+          y: Theme.popupGap
           width: 420
           implicitHeight: toastInner.implicitHeight + 20
           radius: Theme.windowRadius

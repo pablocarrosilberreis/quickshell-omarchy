@@ -54,7 +54,7 @@ PanelWindow {
       x: Math.max(4, Math.min(
         root.anchorX + root.anchorW / 2 - root.popupWidth / 2,
         root.screenWidth - root.popupWidth - 4))
-      y: 4
+      y: Theme.popupGap
       width: root.popupWidth
       radius: root.frameRadius
       implicitHeight: frame.childrenRect.y + frame.childrenRect.height + root.bottomPadding

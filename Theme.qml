@@ -25,6 +25,9 @@ Singleton {
   // Hyprland window rounding (decoration:rounding in ~/.config/hypr/looknfeel.lua).
   readonly property int windowRadius: 8
 
+  // Vertical gap between the bar and popups/toasts anchored below it.
+  readonly property int popupGap: 10
+
   function load(raw) {
     try {
       var c = JSON.parse(raw || "{}")
