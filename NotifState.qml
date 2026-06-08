@@ -24,12 +24,11 @@ Singleton {
     onNotification: (notif) => {
       notif.tracked = true
       notif.receivedAt = Qt.formatTime(new Date(), "HH:mm")
-      // Defer the array reassignments out of the DBus signal callback. They
-      // re-evaluate the `model:` binding of NotifCenter's Repeater, which
-      // regenerates its delegates; doing that re-entrantly during DBus signal
-      // delivery (e.g. while tray/SNI items churn) crashes Qt's QML incubator
-      // (segfault in QQuickRepeater::regenerate). Same reason dismiss()/clearAll
-      // already use Qt.callLater.
+      // Defer the array reassignments out of the DBus signal callback (keeps
+      // model mutation off the re-entrant DBus delivery path, and batches).
+      // NOTE: the actual crash fix is NotifCenter binding its Repeater via
+      // Quickshell.ScriptModel — reassigning a plain JS array forced a full
+      // QQuickRepeater::regenerate() that segfaulted Qt's QML incubator.
       Qt.callLater(function() {
         root.notifications = [notif].concat(root.notifications.slice(0, 99))
         if (!root.muted)

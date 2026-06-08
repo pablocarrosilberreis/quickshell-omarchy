@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Services.Notifications
 
 // Notification history list shown inside the calendar popup.
@@ -107,7 +108,11 @@ Item {
       spacing: 6
 
       Repeater {
-        model: NotifState.notifications
+        // ScriptModel diffs the array and emits granular row inserts/removes
+        // instead of a full reset, so the Repeater never calls regenerate()
+        // (which segfaulted Qt's QML incubator when the whole array was
+        // reassigned on each incoming notification).
+        model: ScriptModel { values: NotifState.notifications }
 
         delegate: Rectangle {
           required property var modelData
