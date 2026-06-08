@@ -24,9 +24,17 @@ Singleton {
     onNotification: (notif) => {
       notif.tracked = true
       notif.receivedAt = Qt.formatTime(new Date(), "HH:mm")
-      root.notifications = [notif].concat(root.notifications.slice(0, 99))
-      if (!root.muted)
-        root.toastQueue = root.toastQueue.concat([notif])
+      // Defer the array reassignments out of the DBus signal callback. They
+      // re-evaluate the `model:` binding of NotifCenter's Repeater, which
+      // regenerates its delegates; doing that re-entrantly during DBus signal
+      // delivery (e.g. while tray/SNI items churn) crashes Qt's QML incubator
+      // (segfault in QQuickRepeater::regenerate). Same reason dismiss()/clearAll
+      // already use Qt.callLater.
+      Qt.callLater(function() {
+        root.notifications = [notif].concat(root.notifications.slice(0, 99))
+        if (!root.muted)
+          root.toastQueue = root.toastQueue.concat([notif])
+      })
     }
   }
 
