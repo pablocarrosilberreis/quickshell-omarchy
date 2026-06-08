@@ -62,7 +62,7 @@ ShellRoot {
           width: 380
           implicitHeight: popupColumn.implicitHeight + 30
           radius: Theme.windowRadius
-          border.color: Qt.lighter(Theme.background, 1.5)
+          border.color: Theme.accent
 
           HoverHandler {
             onHoveredChanged: hovered ? MediaPlayerState.show() : MediaPlayerState.hide()

@@ -17,8 +17,9 @@ Rectangle {
 
   radius: Theme.windowRadius
   color: Qt.darker(Theme.background, 1.8)
-  border.color: Qt.rgba(Theme.foreground.r, Theme.foreground.g, Theme.foreground.b, 0.1)
-  border.width: 1
+  // Match Omarchy's active-window border (Hyprland col.active_border = accent).
+  border.color: Theme.accent
+  border.width: 2
 
   // Hidden resting state; grow from the top edge.
   opacity: 0
