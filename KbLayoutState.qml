@@ -10,6 +10,9 @@ Singleton {
   property real anchorX: 0
   property real anchorW: 0
   property string currentLayout: "EN"
+  // Full human-readable name of the active layout (e.g. "English (US)"),
+  // used for the bar bubble's hover tooltip.
+  property string currentLayoutName: "English (US)"
   property var allLayouts: []
   property bool layoutsLoaded: false
   property var favoriteCodes: ["us", "es"]
@@ -79,6 +82,7 @@ Singleton {
   function setLayout(code) {
     if (code === "us") root.currentLayout = "EN"
     else root.currentLayout = code.toUpperCase()
+    root.currentLayoutName = root.currentLayoutObj.name
     Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/omarchy-set-kb-layout", code])
   }
 
@@ -105,8 +109,10 @@ Singleton {
       "hyprctl devices -j 2>/dev/null | " +
       "jq -r '([.keyboards[] | select(.name | startswith(\"hl-virtual\") | not)] | first | .active_keymap) // \"English\"'"]
     onUpdated: (out) => {
-      var k = out.trim().toLowerCase()
+      var raw = out.trim()
+      var k = raw.toLowerCase()
       if (!k) return
+      root.currentLayoutName = raw
       if (k.indexOf("spanish") >= 0)        root.currentLayout = "ES"
       else if (k.indexOf("french") >= 0)    root.currentLayout = "FR"
       else if (k.indexOf("german") >= 0)    root.currentLayout = "DE"

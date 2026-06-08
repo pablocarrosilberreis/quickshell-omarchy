@@ -5,7 +5,7 @@ BarButton {
   id: root
   pad: 10
   text: KbLayoutState.currentLayout
-  tooltipText: "Click to switch · Right-click to browse layouts"
+  tooltipText: KbLayoutState.currentLayoutName
   onLeftClicked: {
     KbLayoutState.anchorX = root.mapToItem(null, 0, 0).x
     KbLayoutState.anchorW = root.width
