@@ -501,7 +501,7 @@ ShellRoot {
             Text {
               width: parent.width
               wrapMode: Text.Wrap
-              text: NotifState.activeToast ? NotifState.activeToast.summary : ""
+              text: NotifState.title(NotifState.activeToast)
               font.family: Theme.font; font.pixelSize: 13; font.bold: true
               color: Theme.foreground
               renderType: Text.NativeRendering
@@ -509,8 +509,8 @@ ShellRoot {
             Text {
               width: parent.width
               wrapMode: Text.Wrap
-              visible: NotifState.activeToast && NotifState.activeToast.body ? NotifState.activeToast.body.length > 0 : false
-              text: NotifState.activeToast && NotifState.activeToast.body ? NotifState.activeToast.body : ""
+              visible: text.length > 0
+              text: NotifState.subtitle(NotifState.activeToast)
               font.family: Theme.font; font.pixelSize: 11
               color: Theme.foreground; opacity: 0.7
               renderType: Text.NativeRendering

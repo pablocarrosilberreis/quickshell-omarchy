@@ -141,7 +141,7 @@ Item {
             Text {
               width: parent.width
               wrapMode: Text.Wrap
-              text: modelData ? modelData.summary : ""
+              text: NotifState.title(modelData)
               font.family: Theme.font; font.pixelSize: 12; font.bold: true
               color: Theme.foreground
               renderType: Text.NativeRendering
@@ -151,8 +151,8 @@ Item {
               wrapMode: Text.Wrap
               maximumLineCount: 2
               elide: Text.ElideRight
-              visible: modelData && modelData.body ? modelData.body.length > 0 : false
-              text: modelData && modelData.body ? modelData.body : ""
+              visible: text.length > 0
+              text: NotifState.subtitle(modelData)
               font.family: Theme.font; font.pixelSize: 11
               color: Theme.foreground; opacity: 0.6
               renderType: Text.NativeRendering

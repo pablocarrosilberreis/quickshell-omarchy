@@ -94,6 +94,24 @@ Singleton {
 
   // Clear everything. Empty the models first, then destroy the QObjects on the
   // next tick (same dangling-reference reason as dismiss()).
+  // Display title for a notification, robust against empty fields: prefer the
+  // summary, fall back to the body, then the app name, then a generic label —
+  // so a content-less notification never renders as an empty box.
+  function title(n) {
+    if (!n) return ""
+    if (n.summary && n.summary.length) return n.summary
+    if (n.body && n.body.length) return n.body
+    if (n.appName && n.appName.length && n.appName !== "notify-send") return n.appName
+    return "Notificación"
+  }
+
+  // Secondary line: the body, shown only when the summary was used as the title
+  // (otherwise the body was already promoted to the title, or there is none).
+  function subtitle(n) {
+    if (!n || !n.summary || !n.summary.length) return ""
+    return n.body || ""
+  }
+
   function clearAll() {
     var all = _live(notifications)
     notifications = []
