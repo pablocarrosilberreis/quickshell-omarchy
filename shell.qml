@@ -1,14 +1,119 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import Quickshell.Services.Notifications
+import Quickshell.Wayland
+
 
 // Omarchy QuickShell bar — top, one panel per monitor.
 ShellRoot {
   id: shell
 
   property bool barVisible: true
+
+  // ── Reusable popup primitives (inline) ─────────────────────────────────
+  component PopupFrame: Rectangle {
+    id: root
+  
+    property bool popupVisible: false
+    readonly property bool active: _open || _closing
+    property bool _open: false
+    property bool _closing: false
+  
+    radius: Theme.windowRadius
+    color: Qt.darker(Theme.background, 1.8)
+  
+    // Hidden resting state; grow from the top edge.
+    opacity: 0
+    scale: 0.9
+    transformOrigin: Item.Top
+    property real _slideY: -8
+    transform: Translate { y: root._slideY }
+  
+    // If created while already visible (e.g. a stacked-toast Repeater delegate),
+    // play the enter animation so it slides in like the persistent popups.
+    Component.onCompleted: if (popupVisible) { _open = true; enterAnim.restart() }
+  
+    onPopupVisibleChanged: {
+      if (popupVisible) {
+        _closing = false
+        _open = true
+        exitAnim.stop()
+        enterAnim.restart()
+      } else if (_open) {
+        _open = false
+        _closing = true
+        enterAnim.stop()
+        exitAnim.restart()
+      }
+    }
+  
+    // Open: fade in, slide down, and a soft spring-scale with a small overshoot.
+    ParallelAnimation {
+      id: enterAnim
+      NumberAnimation { target: root; property: "opacity"; from: 0;    to: 1; duration: 160; easing.type: Easing.OutCubic }
+      NumberAnimation { target: root; property: "_slideY"; from: -8;   to: 0; duration: 220; easing.type: Easing.OutCubic }
+      NumberAnimation {
+        target: root; property: "scale"; from: 0.9; to: 1
+        duration: 300; easing.type: Easing.OutBack; easing.overshoot: 1.1
+      }
+    }
+  
+    // Close: quick fade + shrink, then release the window.
+    ParallelAnimation {
+      id: exitAnim
+      NumberAnimation { target: root; property: "opacity"; to: 0;    duration: 130; easing.type: Easing.InCubic }
+      NumberAnimation { target: root; property: "_slideY"; to: -6;   duration: 130; easing.type: Easing.InCubic }
+      NumberAnimation { target: root; property: "scale";   to: 0.94; duration: 130; easing.type: Easing.InCubic }
+      onFinished: root._closing = false
+    }
+  }
+  component PopupPanel: PanelWindow {
+    id: root
+  
+    property bool shown: false
+    property real anchorX: 0
+    property real anchorW: 0
+    property real screenWidth: 0
+    property int popupWidth: 300
+    property string ns: "quickshell-popup"
+    property int popupKeyboardFocus: WlrKeyboardFocus.None
+    property real frameRadius: Theme.windowRadius
+    property int bottomPadding: 10
+    signal dismissed()
+  
+    // Content is added to the frame (its parent is the frame).
+    default property alias content: frame.data
+  
+    // Keep the window alive until the frame's close animation finishes.
+    visible: frame.active
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    exclusiveZone: -1
+    WlrLayershell.namespace: root.ns
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: root.popupKeyboardFocus
+    WlrLayershell.margins.top: Theme.barHeight
+  
+    // Internal children assigned explicitly so they don't land in the
+    // `content` default-property alias above.
+    data: [
+      MouseArea { anchors.fill: parent; z: 0; onClicked: root.dismissed() },
+      PopupFrame {
+        id: frame
+        popupVisible: root.shown
+        z: 1
+        x: Math.max(4, Math.min(
+          root.anchorX + root.anchorW / 2 - root.popupWidth / 2,
+          root.screenWidth - root.popupWidth - 4))
+        y: Theme.popupGap
+        width: root.popupWidth
+        radius: root.frameRadius
+        implicitHeight: frame.childrenRect.y + frame.childrenRect.height + root.bottomPadding
+      }
+    ]
+  }
+
 
   Variants {
     model: Quickshell.screens
@@ -287,7 +392,7 @@ ShellRoot {
         anchorW: KbLayoutState.anchorW
         bottomPadding: 5
         onDismissed: KbLayoutState.hide()
-        KbLayoutPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 } }
+        Popups.KbLayoutPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 } }
       }
     }
   }
@@ -308,7 +413,7 @@ ShellRoot {
         anchorW: WifiState.anchorW
         bottomPadding: 5
         onDismissed: WifiState.hide()
-        WifiPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 } }
+        Popups.WifiPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 } }
       }
     }
   }
@@ -326,7 +431,7 @@ ShellRoot {
         anchorX: BluetoothState.anchorX
         anchorW: BluetoothState.anchorW
         onDismissed: BluetoothState.hide()
-        BluetoothPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 } }
+        Popups.BluetoothPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 } }
       }
     }
   }
@@ -346,7 +451,7 @@ ShellRoot {
         anchorW: AudioState.anchorW
         bottomPadding: 7
         onDismissed: AudioState.hide()
-        AudioPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 7 } }
+        Popups.AudioPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 7 } }
       }
     }
   }
@@ -379,7 +484,7 @@ ShellRoot {
           width: 300
           implicitHeight: sysContent.implicitHeight + 10
 
-          SysInfoPopup {
+          Popups.SysInfoPopup {
             id: sysContent
             anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 }
           }
@@ -424,7 +529,7 @@ ShellRoot {
           implicitHeight: calContent.implicitHeight + 36
           radius: Theme.windowRadius
 
-          CalendarPopup {
+          Popups.CalendarPopup {
             id: calContent
             anchors { top: parent.top; topMargin: 18; horizontalCenter: parent.horizontalCenter }
           }
@@ -566,3 +671,4 @@ ShellRoot {
     function hide(): void { shell.barVisible = false }
   }
 }
+

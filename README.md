@@ -137,17 +137,25 @@ omarchy reload
 
 ## Estructura
 
+Consolidado en 14 archivos QML (Quickshell auto-descubre cada `.qml` como tipo
+del módulo `qs`; no hay `qmldir` manual). Widgets, popups y primitivas viven como
+**inline components** (`component X: ...`) dentro de pocos archivos. Los singletons
+son piso fijo: `pragma Singleton` es por archivo, no se pueden fusionar.
+
 ```
 ~/.config/quickshell/
-├── shell.qml              # raíz: paneles por monitor, popups globales
-├── Bar.qml                # layout horizontal de la barra
-├── PopupPanel.qml         # popup anclado reutilizable (cierre al clic fuera)
+├── shell.qml              # raíz: paneles por monitor + ventanas de popups + toasts
+│                          #   + PopupPanel/PopupFrame como inline components
+├── Bar.qml                # barra + los 16 widgets + BarButton/Tooltip/Bubble (inline)
+├── Popups.qml             # los 6 popups + sus filas/secciones (inline planos);
+│                          #   referenciados desde shell.qml como Popups.<Nombre>
+├── Poll.qml               # util compartida (one-shot command → stdout); la usan singletons y barra
+├── *State.qml             # singletons de estado: Wifi/Bluetooth/Audio/KbLayout/SysInfo/Calendar/MediaPlayer/Notif
 ├── Theme.qml              # singleton: colores y fuente del tema activo
 ├── Glyphs.qml             # singleton: iconos Nerd Font
 ├── assets/
 │   └── omarchy-mark.png   # logo para el menú (el glyph no renderiza en Qt)
 ├── bin/                   # scripts helper empaquetados (se instalan en ~/.local/bin)
-├── *.qml                  # un archivo por widget / estado
 ├── install.sh             # script de instalación
 └── kb_favorites.json      # layouts de teclado favoritos
 ```
@@ -158,3 +166,6 @@ omarchy reload
 - No nombrar propiedades `state` (es una propiedad interna de `Item`)
 - Correr scripts con `trap 'kill 0' EXIT` bajo `setsid` para que no maten el proceso de qs
 - Tintear imágenes con `Image { layer.effect: MultiEffect }`, no `ColorOverlay`
+- Los inline components (`component X: ...`) se declaran en el objeto raíz del
+  archivo y **no se pueden anidar** uno dentro de otro: por eso en `Popups.qml`
+  los popups y sus sub-filas están todos planos al mismo nivel
