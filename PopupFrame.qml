@@ -25,8 +25,9 @@ Rectangle {
   property real _slideY: -8
   transform: Translate { y: root._slideY }
 
-  // If created while already visible (rare), claim the window without animating.
-  Component.onCompleted: if (popupVisible) _open = true
+  // If created while already visible (e.g. a stacked-toast Repeater delegate),
+  // play the enter animation so it slides in like the persistent popups.
+  Component.onCompleted: if (popupVisible) { _open = true; enterAnim.restart() }
 
   onPopupVisibleChanged: {
     if (popupVisible) {

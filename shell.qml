@@ -437,7 +437,7 @@ ShellRoot {
     }
   }
 
-  // ── Notification toasts — top-center, slide from bar ───────────────────
+  // ── Notification toasts — up to 3 stacked at top-center ────────────────
   Variants {
     model: Quickshell.screens
 
@@ -446,7 +446,9 @@ ShellRoot {
         required property var modelData
         screen: modelData
 
-        visible: toastRect.active
+        // Stay mapped while any toast is on screen (incl. its close animation,
+        // since expireToast only removes the item once the anim has finished).
+        visible: NotifState.visibleToasts.length > 0
         anchors { top: true; bottom: true; left: true; right: true }
         color: "transparent"
         exclusiveZone: -1
@@ -455,96 +457,95 @@ ShellRoot {
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.margins.top: Theme.barHeight
 
-        property var toast: NotifState.activeToast
+        Column {
+          anchors { top: parent.top; topMargin: Theme.popupGap; horizontalCenter: parent.horizontalCenter }
+          spacing: 8
 
-        onToastChanged: {
-          if (toast !== null)
-            toastTimer.restart()
-          else
-            toastTimer.stop()
-        }
+          Repeater {
+            // ScriptModel diffs by reference, so existing toasts keep their
+            // delegate (and their running 3s timer) when the stack shifts.
+            model: ScriptModel { values: NotifState.visibleToasts }
 
-        // Every toast shows for a few seconds, then auto-dismisses off-screen.
-        // popToast only drops it from the on-screen queue — it stays in the
-        // notification center until the user clears it. Applies to all
-        // urgencies (incl. Critical), so nothing gets stuck on screen.
-        Timer {
-          id: toastTimer
-          interval: 3000
-          onTriggered: NotifState.popToast()
-        }
+            delegate: PopupFrame {
+              id: toastFrame
+              required property var modelData
 
-        PopupFrame {
-          id: toastRect
-          popupVisible: NotifState.activeToast !== null
-          z: 1
-          x: Math.round((modelData.width - 420) / 2)
-          y: Theme.popupGap
-          width: 420
-          implicitHeight: toastInner.implicitHeight + 20
-          radius: Theme.windowRadius
-          // Green frame matching Omarchy's active-window border (col.active_border).
-          border.color: Theme.accent
-          border.width: 2
+              // Each toast owns its lifetime: visible 3s, then it animates out
+              // and removes itself from the stack once the anim finishes.
+              property bool alive: true
+              popupVisible: alive && modelData != null
+              onActiveChanged: if (!active) NotifState.expireToast(toastFrame.modelData)
 
-          Column {
-            id: toastInner
-            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10; rightMargin: 32 }
-            spacing: 3
+              width: 420
+              implicitHeight: toastInner.implicitHeight + 20
+              radius: Theme.windowRadius
+              // Green frame matching Omarchy's active-window border.
+              border.color: Theme.accent
+              border.width: 2
 
-            Text {
-              text: NotifState.sourceLabel(NotifState.activeToast)
-              font.family: Theme.font; font.pixelSize: 10
-              color: Theme.foreground; opacity: 0.45
-              renderType: Text.NativeRendering
-            }
-            Text {
-              width: parent.width
-              wrapMode: Text.Wrap
-              text: NotifState.title(NotifState.activeToast)
-              font.family: Theme.font; font.pixelSize: 13; font.bold: true
-              color: Theme.foreground
-              renderType: Text.NativeRendering
-            }
-            Text {
-              width: parent.width
-              wrapMode: Text.Wrap
-              visible: text.length > 0
-              text: NotifState.subtitle(NotifState.activeToast)
-              font.family: Theme.font; font.pixelSize: 11
-              color: Theme.foreground; opacity: 0.7
-              renderType: Text.NativeRendering
-            }
-          }
+              Timer { running: toastFrame.alive; interval: 3000; onTriggered: toastFrame.alive = false }
 
-          // Click body to open screenshot in editor (or dismiss)
-          MouseArea {
-            anchors { left: parent.left; right: parent.right; top: parent.top; bottom: parent.bottom; rightMargin: 32 }
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              var t = NotifState.activeToast
-              if (!t) { NotifState.dismissToast(); return }
-              if ((t.summary || "").indexOf("Screenshot") >= 0) {
-                Quickshell.execDetached(["bash", "-c",
-                  "f=$(ls -t ~/Pictures/screenshot-*.png 2>/dev/null | head -1); [ -n \"$f\" ] && satty --filename \"$f\" --output-filename \"$f\" --actions-on-enter save-to-clipboard --save-after-copy --copy-command wl-copy"])
+              Column {
+                id: toastInner
+                anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10; rightMargin: 32 }
+                spacing: 3
+
+                Text {
+                  text: NotifState.sourceLabel(toastFrame.modelData)
+                  font.family: Theme.font; font.pixelSize: 10
+                  color: Theme.foreground; opacity: 0.45
+                  renderType: Text.NativeRendering
+                }
+                Text {
+                  width: parent.width
+                  wrapMode: Text.Wrap
+                  text: NotifState.title(toastFrame.modelData)
+                  font.family: Theme.font; font.pixelSize: 13; font.bold: true
+                  color: Theme.foreground
+                  renderType: Text.NativeRendering
+                }
+                Text {
+                  width: parent.width
+                  wrapMode: Text.Wrap
+                  visible: text.length > 0
+                  text: NotifState.subtitle(toastFrame.modelData)
+                  font.family: Theme.font; font.pixelSize: 11
+                  color: Theme.foreground; opacity: 0.7
+                  renderType: Text.NativeRendering
+                }
               }
-              var acts = t.actions || []
-              for (var i = 0; i < acts.length; i++) {
-                if (acts[i].identifier === "default") { try { acts[i].invoke() } catch (e) {} break }
-              }
-              NotifState.dismissToast()
-            }
-          }
 
-          Text {
-            anchors { right: parent.right; top: parent.top; margins: 10 }
-            text: "✕"
-            font.family: Theme.font; font.pixelSize: 12
-            color: Theme.foreground; opacity: 0.45
-            MouseArea {
-              anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
-              onClicked: NotifState.dismissToast()
+              // Click body: run default action (or open screenshot), then dismiss.
+              MouseArea {
+                anchors { left: parent.left; right: parent.right; top: parent.top; bottom: parent.bottom; rightMargin: 32 }
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  var t = toastFrame.modelData
+                  if (t) {
+                    if ((t.summary || "").indexOf("Screenshot") >= 0) {
+                      Quickshell.execDetached(["bash", "-c",
+                        "f=$(ls -t ~/Pictures/screenshot-*.png 2>/dev/null | head -1); [ -n \"$f\" ] && satty --filename \"$f\" --output-filename \"$f\" --actions-on-enter save-to-clipboard --save-after-copy --copy-command wl-copy"])
+                    }
+                    var acts = t.actions || []
+                    for (var i = 0; i < acts.length; i++) {
+                      if (acts[i].identifier === "default") { try { acts[i].invoke() } catch (e) {} break }
+                    }
+                  }
+                  toastFrame.alive = false
+                }
+              }
+
+              Text {
+                anchors { right: parent.right; top: parent.top; margins: 10 }
+                text: "✕"
+                font.family: Theme.font; font.pixelSize: 12
+                color: Theme.foreground; opacity: 0.45
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: toastFrame.alive = false
+                }
+              }
             }
           }
         }

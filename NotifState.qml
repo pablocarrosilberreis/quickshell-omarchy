@@ -13,6 +13,18 @@ Singleton {
   property var toastQueue: []
   readonly property var activeToast: toastQueue.length > 0 ? toastQueue[0] : null
 
+  // Up to this many toasts are shown stacked on screen at once; the rest queue.
+  readonly property int maxVisibleToasts: 3
+  readonly property var visibleToasts: _live(toastQueue).slice(0, maxVisibleToasts)
+
+  // Drop one specific notification from the on-screen toast stack (it stays in
+  // the history). Deferred so a toast delegate is never destroyed mid-callback.
+  function expireToast(notif) {
+    Qt.callLater(function() {
+      root.toastQueue = root._live(root.toastQueue).filter(function(n) { return n !== notif })
+    })
+  }
+
   // Do-not-disturb: when true, toasts are suppressed (history still recorded).
   property bool muted: false
   function toggleMute() { root.muted = !root.muted }
@@ -50,17 +62,9 @@ Singleton {
     }
   }
 
-  // Called by toast timer when a toast auto-expires (keeps in history).
-  function popToast() {
-    if (toastQueue.length > 0)
-      toastQueue = _live(toastQueue.slice(1))
-  }
-
-  // Called when user closes the toast manually (keeps in history).
-  function dismissToast() {
-    if (toastQueue.length > 0)
-      toastQueue = _live(toastQueue.slice(1))
-  }
+  // Clear the whole on-screen toast stack at once (they stay in the history) —
+  // e.g. when the notification center is opened.
+  function clearToasts() { toastQueue = [] }
 
   // Remove a notification from history entirely. Order matters: drop the
   // reference from the models FIRST (so the Repeater/toast destroy their

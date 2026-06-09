@@ -14,7 +14,7 @@ Singleton {
 
   property var weather: null
 
-  function show() { hideTimer.stop(); _show = true; NotifState.dismissToast() }
+  function show() { hideTimer.stop(); _show = true; NotifState.clearToasts() }
   function hide() { hideTimer.restart() }
 
   Timer { id: hideTimer; interval: 350; onTriggered: root._show = false }
