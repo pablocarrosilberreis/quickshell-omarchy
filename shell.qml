@@ -457,7 +457,12 @@ ShellRoot {
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.margins.top: Theme.barHeight
 
+        // Only the toast stack captures the mouse; the rest of this full-screen
+        // overlay is click-through, so windows behind stay usable.
+        mask: Region { item: toastStack }
+
         Column {
+          id: toastStack
           anchors { top: parent.top; topMargin: Theme.popupGap; horizontalCenter: parent.horizontalCenter }
           spacing: 8
 
