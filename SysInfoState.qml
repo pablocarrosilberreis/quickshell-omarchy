@@ -5,7 +5,10 @@ import Quickshell
 Singleton {
   id: root
 
-  property bool visible: false
+  // 350 ms hide-delay so the mouse can cross the gap from the bar item into the
+  // popup without it closing (mirrors MediaPlayerState).
+  property bool _show: false
+  readonly property bool visible: _show
   property real anchorX: 0
   property real anchorW: 0
 
@@ -22,10 +25,10 @@ Singleton {
 
   function show() {
     WifiState.hide(); BluetoothState.hide(); AudioState.hide(); KbLayoutState.hide()
-    root.visible = true
+    hideTimer.stop(); root._show = true
   }
-  function hide()   { root.visible = false }
-  function toggle() { root.visible ? hide() : show() }
+  function hide()   { hideTimer.restart() }
+  Timer { id: hideTimer; interval: 350; onTriggered: root._show = false }
 
   Poll {
     // Faster while the detailed popup is open; relaxed (and bar-only, via
@@ -41,12 +44,16 @@ Singleton {
         root.ramPct       = d.ram_pct  || 0
         root.ramUsed      = d.ram_used  || 0
         root.ramTotal     = d.ram_total || 0
-        root.gpu          = d.gpu          != null ? d.gpu          : -1
-        root.gpuVramUsed  = d.gpu_vram_used  != null ? d.gpu_vram_used  : -1
-        root.gpuVramTotal = d.gpu_vram_total != null ? d.gpu_vram_total : -1
         root.cpuTemp      = d.cpu_temp != null ? d.cpu_temp : -1
-        root.gpuTemp      = d.gpu_temp != null ? d.gpu_temp : -1
-        root.nvmeTemp     = d.nvme_temp != null ? d.nvme_temp : -1
+        // GPU usage / VRAM / GPU temp / NVMe temp only come in the full (non
+        // --light) snapshot. The idle bar poll uses --light, so keep the last
+        // known values cached instead of blanking them — the popup shows them
+        // immediately on hover, then they refresh while it stays open.
+        if (d.gpu            != null) root.gpu          = d.gpu
+        if (d.gpu_vram_used  != null) root.gpuVramUsed  = d.gpu_vram_used
+        if (d.gpu_vram_total != null) root.gpuVramTotal = d.gpu_vram_total
+        if (d.gpu_temp       != null) root.gpuTemp      = d.gpu_temp
+        if (d.nvme_temp      != null) root.nvmeTemp     = d.nvme_temp
       } catch (e) {}
     }
   }

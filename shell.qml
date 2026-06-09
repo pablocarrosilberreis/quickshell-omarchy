@@ -351,20 +351,43 @@ ShellRoot {
     }
   }
 
-  // System resources popup — below the CPU/RAM widget on click.
+  // System resources popup — appears below the CPU/RAM widget on hover.
   Variants {
     model: Quickshell.screens
     delegate: Component {
-      PopupPanel {
+      PanelWindow {
         required property var modelData
         screen: modelData
-        screenWidth: modelData.width
-        shown: SysInfoState.visible
-        ns: "quickshell-sysinfo"
-        anchorX: SysInfoState.anchorX
-        anchorW: SysInfoState.anchorW
-        onDismissed: SysInfoState.hide()
-        SysInfoPopup { anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 } }
+
+        visible: sysFrame.active
+        anchors { top: true; bottom: true; left: true; right: true }
+        color: "transparent"
+        exclusiveZone: -1
+
+        WlrLayershell.namespace: "quickshell-sysinfo"
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.margins.top: Theme.barHeight
+
+        PopupFrame {
+          id: sysFrame
+          popupVisible: SysInfoState.visible
+          z: 1
+          x: Math.max(4, Math.min(
+            SysInfoState.anchorX + SysInfoState.anchorW / 2 - width / 2,
+            modelData.width - width - 4))
+          y: Theme.popupGap
+          width: 300
+          implicitHeight: sysContent.implicitHeight + 10
+
+          SysInfoPopup {
+            id: sysContent
+            anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 }
+          }
+
+          HoverHandler {
+            onHoveredChanged: hovered ? SysInfoState.show() : SysInfoState.hide()
+          }
+        }
       }
     }
   }

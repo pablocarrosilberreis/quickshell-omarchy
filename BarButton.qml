@@ -15,6 +15,8 @@ Item {
 
   property string tooltipText: ""
   property bool bgVisible: false
+  // True while the pointer is over this module (for hover-driven popups).
+  property alias hovered: mouse.containsMouse
   property string leftCmd: ""
   property string rightCmd: ""
   property string middleCmd: ""

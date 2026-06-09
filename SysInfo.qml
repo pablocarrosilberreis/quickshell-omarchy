@@ -21,9 +21,13 @@ BarButton {
     return s
   }
 
-  onLeftClicked: {
-    SysInfoState.anchorX = root.mapToItem(null, 0, 0).x
-    SysInfoState.anchorW = root.width
-    SysInfoState.toggle()
+  onHoveredChanged: {
+    if (hovered) {
+      SysInfoState.anchorX = root.mapToItem(null, 0, 0).x
+      SysInfoState.anchorW = root.width
+      SysInfoState.show()
+    } else {
+      SysInfoState.hide()
+    }
   }
 }
