@@ -119,8 +119,11 @@ Item {
         delegate: Rectangle {
           required property var modelData
           required property int index
+          // modelData can briefly turn null if its Notification QObject is
+          // destroyed; collapse and guard everything against that.
+          visible: modelData != null
           width: listCol.width
-          implicitHeight: itemContent.implicitHeight + 16
+          implicitHeight: modelData != null ? itemContent.implicitHeight + 16 : 0
           radius: 8
           color: Qt.rgba(Theme.foreground.r, Theme.foreground.g, Theme.foreground.b, 0.05)
 
@@ -138,7 +141,7 @@ Item {
             Text {
               width: parent.width
               wrapMode: Text.Wrap
-              text: modelData.summary
+              text: modelData ? modelData.summary : ""
               font.family: Theme.font; font.pixelSize: 12; font.bold: true
               color: Theme.foreground
               renderType: Text.NativeRendering
@@ -148,8 +151,8 @@ Item {
               wrapMode: Text.Wrap
               maximumLineCount: 2
               elide: Text.ElideRight
-              visible: modelData.body.length > 0
-              text: modelData.body
+              visible: modelData && modelData.body ? modelData.body.length > 0 : false
+              text: modelData && modelData.body ? modelData.body : ""
               font.family: Theme.font; font.pixelSize: 11
               color: Theme.foreground; opacity: 0.6
               renderType: Text.NativeRendering
@@ -160,13 +163,14 @@ Item {
             anchors { left: parent.left; right: parent.right; top: parent.top; bottom: parent.bottom; rightMargin: 28 }
             cursorShape: Qt.PointingHandCursor
             onClicked: {
-              if (modelData.summary.indexOf("Screenshot") >= 0) {
+              if (!modelData) return
+              if ((modelData.summary || "").indexOf("Screenshot") >= 0) {
                 Quickshell.execDetached(["bash", "-c",
                   "f=$(ls -t ~/Pictures/screenshot-*.png 2>/dev/null | head -1); [ -n \"$f\" ] && satty --filename \"$f\" --output-filename \"$f\" --actions-on-enter save-to-clipboard --save-after-copy --copy-command wl-copy"])
               }
               var acts = modelData.actions || []
               for (var i = 0; i < acts.length; i++) {
-                if (acts[i].identifier === "default") { acts[i].invoke(); break }
+                if (acts[i].identifier === "default") { try { acts[i].invoke() } catch (e) {} break }
               }
               NotifState.dismiss(modelData)
             }
@@ -174,7 +178,7 @@ Item {
 
           Text {
             anchors { right: parent.right; bottom: itemContent.bottom; rightMargin: 8; bottomMargin: 0 }
-            text: modelData.receivedAt || ""
+            text: modelData ? (modelData.receivedAt || "") : ""
             font.family: Theme.font; font.pixelSize: 9
             color: Theme.foreground; opacity: 0.85
             renderType: Text.NativeRendering

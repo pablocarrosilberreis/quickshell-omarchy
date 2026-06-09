@@ -509,8 +509,8 @@ ShellRoot {
             Text {
               width: parent.width
               wrapMode: Text.Wrap
-              visible: NotifState.activeToast ? NotifState.activeToast.body.length > 0 : false
-              text: NotifState.activeToast ? NotifState.activeToast.body : ""
+              visible: NotifState.activeToast && NotifState.activeToast.body ? NotifState.activeToast.body.length > 0 : false
+              text: NotifState.activeToast && NotifState.activeToast.body ? NotifState.activeToast.body : ""
               font.family: Theme.font; font.pixelSize: 11
               color: Theme.foreground; opacity: 0.7
               renderType: Text.NativeRendering
@@ -524,13 +524,13 @@ ShellRoot {
             onClicked: {
               var t = NotifState.activeToast
               if (!t) { NotifState.dismissToast(); return }
-              if (t.summary.indexOf("Screenshot") >= 0) {
+              if ((t.summary || "").indexOf("Screenshot") >= 0) {
                 Quickshell.execDetached(["bash", "-c",
                   "f=$(ls -t ~/Pictures/screenshot-*.png 2>/dev/null | head -1); [ -n \"$f\" ] && satty --filename \"$f\" --output-filename \"$f\" --actions-on-enter save-to-clipboard --save-after-copy --copy-command wl-copy"])
               }
               var acts = t.actions || []
               for (var i = 0; i < acts.length; i++) {
-                if (acts[i].identifier === "default") { acts[i].invoke(); break }
+                if (acts[i].identifier === "default") { try { acts[i].invoke() } catch (e) {} break }
               }
               NotifState.dismissToast()
             }
