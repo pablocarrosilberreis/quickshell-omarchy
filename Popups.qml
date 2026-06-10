@@ -1044,6 +1044,7 @@ Item {
           // Sanitize any overdriven sink-inputs left by previous broken code
           var streams = d.streams || []
           streams.forEach(function(s) {
+            if (s.device) return  // device-volume entries are never overdriven
             if (s.vol > 100) {
               s.vol = 100
               var ids = s.indices || (s.index !== undefined ? [s.index] : [])
@@ -1253,6 +1254,11 @@ Item {
                 id: appDebounce
                 interval: 40
                 onTriggered: {
+                  if (modelData.device) {
+                    Quickshell.execDetached(["bash", "-c",
+                      "pactl set-sink-volume " + modelData.device + " " + Math.round(localVol * 100) + "%"])
+                    return
+                  }
                   var ids = modelData.indices || (modelData.index !== undefined ? [modelData.index] : [])
                   ids.forEach(function(i) {
                     Quickshell.execDetached(["bash", "-c",
@@ -1307,6 +1313,11 @@ Item {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                   localMuted = !localMuted
+                  if (modelData.device) {
+                    Quickshell.execDetached(["bash", "-c",
+                      "pactl set-sink-mute " + modelData.device + " toggle"])
+                    return
+                  }
                   var ids = modelData.indices || (modelData.index !== undefined ? [modelData.index] : [])
                   ids.forEach(function(i) {
                     Quickshell.execDetached(["bash", "-c",

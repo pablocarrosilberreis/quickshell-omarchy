@@ -20,6 +20,12 @@ BINARY_NAMES = {
 # app.name values that are too generic to trust over the binary name
 GENERIC_NAMES = {"chromium", "electron", "chrome", "brave", "opera", "vivaldi"}
 
+# Virtual per-app sinks: streams playing into these are controlled via the
+# sink's device volume (the app rewrites its own stream volume, e.g. Zen on seek)
+VIRTUAL_SINKS = {"zen_sink"}
+# Internal loopback streams of those sinks — never show them
+INTERNAL_NODES = {"zen_sink.output"}
+
 def proc_name(pid):
     try:
         n = run(["ps", "-p", pid, "-o", "comm="]).strip()
@@ -55,6 +61,18 @@ master = {
     "muted": "yes" in master_mute_text,
 }
 
+# Sink id → name map, to detect streams playing into virtual sinks
+sink_names = {}
+for line in run(["pactl", "list", "short", "sinks"]).strip().splitlines():
+    parts = line.split("\t")
+    if len(parts) >= 2:
+        sink_names[parts[0]] = parts[1]
+
+def sink_volume(name):
+    v = re.search(r"(\d+)%", run(["pactl", "get-sink-volume", name]))
+    m = "yes" in run(["pactl", "get-sink-mute", name])
+    return (int(v.group(1)) if v else 100, m)
+
 results = []
 sink_text = run(["pactl", "list", "sink-inputs"])
 for block in re.split(r"(?=^Sink Input #)", sink_text, flags=re.MULTILINE):
@@ -63,11 +81,22 @@ for block in re.split(r"(?=^Sink Input #)", sink_text, flags=re.MULTILINE):
         continue
     index = int(idx_m.group(1))
 
+    node_m = re.search(r'node\.name = "(.+?)"', block)
+    if node_m and node_m.group(1) in INTERNAL_NODES:
+        continue
+
     vol_m = re.search(r"(\d+)%", block)
     vol = int(vol_m.group(1)) if vol_m else 0
 
     mute_m = re.search(r"^\s*Mute:\s*(\S+)", block, re.MULTILINE)
     muted = mute_m.group(1) == "yes" if mute_m else False
+
+    # Stream into a virtual sink: report/control the sink's volume instead
+    device = None
+    sid_m = re.search(r"^\s*Sink:\s*(\d+)", block, re.MULTILINE)
+    if sid_m and sink_names.get(sid_m.group(1)) in VIRTUAL_SINKS:
+        device = sink_names[sid_m.group(1)]
+        vol, muted = sink_volume(device)
 
     # Collect both name sources
     app_nm  = re.search(r'application\.name = "(.+?)"', block)
@@ -90,14 +119,18 @@ for block in re.split(r"(?=^Sink Input #)", sink_text, flags=re.MULTILINE):
             nn = re.search(r'node\.name = "(.+?)"', block)
             name = nn.group(1) if nn else "App"
 
-    results.append({"index": index, "name": name.capitalize(), "vol": vol, "muted": muted})
+    results.append({"index": index, "name": name.capitalize(), "vol": vol, "muted": muted, "device": device})
 
 merged = {}
 for s in results:
     n = s["name"]
     if n not in merged:
         merged[n] = {"indices": [s["index"]], "name": n, "vol": s["vol"], "muted": s["muted"]}
+        if s["device"]:
+            merged[n]["device"] = s["device"]
     else:
         merged[n]["indices"].append(s["index"])
+        if s["device"]:
+            merged[n]["device"] = s["device"]
 
 print(json.dumps({"master": master, "streams": list(merged.values())}))
