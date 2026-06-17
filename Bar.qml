@@ -747,12 +747,20 @@ Item {
     }
 
     Poll {
+      id: poll
       command: ["omarchy-peripheral-batteries"]
       interval: 300000
       onUpdated: (out) => {
         try { root.devs = JSON.parse(out) }
         catch (e) { root.devs = [] }
       }
+    }
+
+    // Refresh on hover (HoverHandler doesn't steal the BarButtons' mouse events,
+    // so per-device tooltips/clicks keep working). poll.run() no-ops if already
+    // running, so this can't pile up.
+    HoverHandler {
+      onHoveredChanged: if (hovered) poll.run()
     }
 
     Repeater {
