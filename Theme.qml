@@ -3,8 +3,13 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Live theme palette, sourced from the active Omarchy theme's quickshell.json
-// (primary/background/backgroundText). Hot-reloads on `omarchy theme set`.
+// Live theme palette, sourced from the active Omarchy theme's colors.toml.
+// Every theme ships one (omarchy generates it from alacritty.toml if missing),
+// so the bar recolors for ALL themes — not just ones with a quickshell.json.
+//
+// `omarchy theme set` swaps the theme dir atomically (rm -rf + mv), which the
+// file watcher below can't follow, so the theme-set hook pokes us to reload
+// over IPC: `qs ipc call theme reload`.
 Singleton {
   id: root
 
@@ -29,18 +34,31 @@ Singleton {
   readonly property int popupGap: 10
 
   function load(raw) {
-    try {
-      var c = JSON.parse(raw || "{}")
-      if (c.background) root.background = c.background
-      if (c.backgroundText) root.foreground = c.backgroundText
-      if (c.primary) root.accent = c.primary
-    } catch (e) {}
+    // colors.toml is `key = "#rrggbb"`; pull the semantic ones. Anchored to the
+    // line start so `background` doesn't match `selection_background`, etc.
+    function val(key) {
+      var m = (raw || "").match(
+        new RegExp("^[ \\t]*" + key + "[ \\t]*=[ \\t]*\"?(#[0-9a-fA-F]{3,8})", "m"))
+      return m ? m[1] : null
+    }
+    var bg = val("background"), fg = val("foreground"), ac = val("accent")
+    if (bg) root.background = bg
+    if (fg) root.foreground = fg
+    if (ac) root.accent = ac
   }
 
+  function reloadPalette() { colors.reload(); root.load(colors.text()) }
+
   FileView {
-    path: Quickshell.env("HOME") + "/.config/omarchy/current/theme/quickshell.json"
+    id: colors
+    path: Quickshell.env("HOME") + "/.config/omarchy/current/theme/colors.toml"
     watchChanges: true
     onLoaded: root.load(text())
     onFileChanged: { reload(); root.load(text()) }
+  }
+
+  IpcHandler {
+    target: "theme"
+    function reload(): void { root.reloadPalette() }
   }
 }

@@ -1,0 +1,6 @@
+#!/bin/bash
+# Reload the QuickShell bar palette after an omarchy theme change.
+# omarchy swaps the theme dir atomically (rm -rf + mv), so the bar's file watch
+# can't follow it — trigger an explicit reload over IPC instead.
+command -v qs >/dev/null 2>&1 || exit 0
+qs ipc call theme reload >/dev/null 2>&1 || true

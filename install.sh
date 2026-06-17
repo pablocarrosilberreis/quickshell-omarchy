@@ -52,6 +52,15 @@ if compgen -G "$REPO_DIR/udev/*.rules" >/dev/null; then
   fi
 fi
 
+# Omarchy theme-set hook: reload the bar palette on theme change (the theme dir
+# is swapped atomically, so the bar's file watch can't follow it).
+if [ -d "$REPO_DIR/hooks/theme-set.d" ]; then
+  echo "==> Installing omarchy theme-set hook (recolor bar on theme change)"
+  mkdir -p "$HOME/.config/omarchy/hooks/theme-set.d"
+  cp "$REPO_DIR"/hooks/theme-set.d/* "$HOME/.config/omarchy/hooks/theme-set.d/"
+  chmod +x "$HOME/.config/omarchy/hooks/theme-set.d/"*quickshell* 2>/dev/null || true
+fi
+
 # Optional battery-readout helpers for omarchy-peripheral-batteries:
 #  - solaar: live HID++ query for Logitech devices (the kernel/UPower value
 #    freezes while charging; solaar gives a fresh level and takes priority).
