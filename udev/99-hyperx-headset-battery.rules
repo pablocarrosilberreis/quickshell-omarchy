@@ -1,0 +1,5 @@
+# Grant non-root access to the HyperX Cloud III S Wireless (USB 03f0:06be) so
+# `omarchy-peripheral-batteries` can query its battery over the vendor HID
+# protocol. headsetcontrol 3.1.0 does not support this model, so it ships no
+# rule of its own and the hidraw node is root-only by default.
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="06be", MODE="0660", GROUP="input", TAG+="uaccess"

@@ -23,7 +23,9 @@ import json
 import os
 import re
 import glob
+import time
 import fcntl
+import select
 import shutil
 import subprocess
 
@@ -208,6 +210,52 @@ def solaar_devices():
     return res
 
 
+# ── HyperX Cloud III S Wireless (vendor HID, headsetcontrol doesn't support it) ─
+# Protocol reverse-engineered by auto94/HyperX-Cloud-2-Battery-Monitor: on the
+# vendor interface (USB 03f0:06be) write [0c 02 03 01 00 06] padded to 52 bytes,
+# read the reply, battery is byte 6. Off state replies 0xff (>100). Needs hidraw
+# write access via udev rule 99-hyperx-headset-battery.rules.
+def hyperx_headset():
+    for hr in glob.glob("/sys/class/hidraw/hidraw*"):
+        try:
+            uevent = open(os.path.join(hr, "device", "uevent")).read().upper()
+        except OSError:
+            continue
+        if "03F0" not in uevent or "06BE" not in uevent:
+            continue
+        dev = "/dev/" + os.path.basename(hr)
+        try:
+            fd = os.open(dev, os.O_RDWR | os.O_NONBLOCK)
+        except OSError:
+            return None  # no access yet (udev rule not applied)
+        try:
+            # drain any stale input reports so we read the reply to our query
+            while select.select([fd], [], [], 0)[0]:
+                try:
+                    os.read(fd, 64)
+                except OSError:
+                    break
+            cmd = bytes([0x0c, 0x02, 0x03, 0x01, 0x00, 0x06]) + bytes(46)
+            os.write(fd, cmd)
+            deadline = time.time() + 1.0
+            while time.time() < deadline:
+                if not select.select([fd], [], [], deadline - time.time())[0]:
+                    break
+                try:
+                    data = os.read(fd, 64)
+                except OSError:
+                    break
+                if len(data) > 6 and 1 <= data[6] <= 100:
+                    return {"kind": "headset", "label": "HyperX",
+                            "pct": data[6], "charging": False}
+            return None
+        except OSError:
+            return None
+        finally:
+            os.close(fd)
+    return None
+
+
 def main():
     devs = []
     solaar = solaar_devices()
@@ -229,6 +277,12 @@ def main():
     if kb:
         devs.append(kb)
     devs.extend(headsetcontrol_devices())
+    # HyperX Cloud III S (its own vendor protocol; headsetcontrol can't see it).
+    # Only if nothing else already reported a headset.
+    if not any(d["kind"] == "headset" for d in devs):
+        hx = hyperx_headset()
+        if hx:
+            devs.append(hx)
 
     # collapse duplicate kinds (e.g. headset from both UPower and headsetcontrol)
     seen = {}
