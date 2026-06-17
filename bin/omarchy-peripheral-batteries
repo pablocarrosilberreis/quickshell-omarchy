@@ -201,8 +201,10 @@ def solaar_devices():
                  "headset": "headset", "headphones": "headset",
                  "touchpad": "mouse"}.get(kind, "other")
             label = {"mouse": "Mouse", "keyboard": "Teclado"}.get(k, name)
+            # "DISCHARGING" also contains "CHARG", so guard against it.
+            charging = "CHARG" in status and "DISCHARG" not in status
             res.append({"kind": k, "label": label, "pct": pct,
-                        "charging": "CHARG" in status})
+                        "charging": charging})
     return res
 
 
@@ -210,9 +212,15 @@ def main():
     devs = []
     solaar = solaar_devices()
     devs.extend(solaar)
-    # Solaar (live) wins over UPower (cached) for any kind it already covers.
-    solaar_kinds = {d["kind"] for d in solaar}
-    devs.extend(d for d in upower_devices() if d["kind"] not in solaar_kinds)
+    # Solaar is authoritative for Logitech: it only yields a device when it gets
+    # a *live* battery reading, so a disconnected/asleep mouse drops off instead
+    # of lingering with a stale UPower value. When solaar is installed, never let
+    # UPower contribute mouse/keyboard entries (those are the Logitech ones;
+    # AirPods come through as "earbuds"/"headset" and are still allowed).
+    exclude = {d["kind"] for d in solaar}
+    if shutil.which("solaar"):
+        exclude |= {"mouse", "keyboard"}
+    devs.extend(d for d in upower_devices() if d["kind"] not in exclude)
     kb = compx_keyboard()
     if kb:
         devs.append(kb)
