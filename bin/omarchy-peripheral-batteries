@@ -221,12 +221,13 @@ def main():
     if shutil.which("solaar"):
         exclude |= {"mouse", "keyboard"}
     devs.extend(d for d in upower_devices() if d["kind"] not in exclude)
-    # NOTE: the Compx keyboard is intentionally NOT included. Its only readable
-    # HID feature report (0x06) carries a *static* value (byte 3 = 0x64), not a
-    # live battery level — it stayed at 100% for hours of battery use. The real
-    # level would need the proprietary vendor command channel (report 0x13),
-    # which is undocumented for this generic 3554:fa09 receiver. compx_keyboard()
-    # is kept for reference but not called, to avoid showing a fake 100%.
+    # Aula F75 keyboard on its Compx 2.4G receiver: battery is in HID feature
+    # report 0x06, byte 3. Validated against the keyboard's own indicator
+    # (FN+B): byte 3 = 0x64 = 100% matched all-keys-green. It just stays at 100%
+    # for a long time because keyboards last weeks on a charge.
+    kb = compx_keyboard()
+    if kb:
+        devs.append(kb)
     devs.extend(headsetcontrol_devices())
 
     # collapse duplicate kinds (e.g. headset from both UPower and headsetcontrol)
