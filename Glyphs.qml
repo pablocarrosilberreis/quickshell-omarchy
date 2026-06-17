@@ -54,7 +54,7 @@ Singleton {
   readonly property string charging: "󰉁"
   readonly property string headset: "󰋎"      // nf-md-headphones
   readonly property string laptop: "󰌢"       // nf-md-laptop
-  readonly property string usb: "󰕓"          // nf-md-usb (wireless dongle / peripherals)
+  readonly property string plug: "󰚥"         // nf-md-power-plug (peripherals)
 
   // battery
   readonly property string batFull: "󰂅"

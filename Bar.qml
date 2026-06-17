@@ -721,12 +721,12 @@ Item {
     // Eagerly touch BatteryState so its poll starts (the popup needs devs).
     Component.onCompleted: BatteryState.devs
 
-    // Always shown: laptop battery level if there is one, otherwise the USB /
-    // wireless icon for the peripherals (a desktop always has some). Gating on
-    // devCount made the bubble start hidden and never reflow once devs loaded.
+    // Always shown: laptop battery level if there is one, otherwise a plug icon
+    // for the peripherals (a desktop always has some). Gating on devCount made
+    // the bubble start hidden and never reflow once devs loaded.
     visible: true
 
-    text: laptop ? (batIcon + "  " + pct + "%") : Glyphs.usb
+    text: laptop ? (batIcon + "  " + pct + "%") : Glyphs.plug
 
     color: (laptop && !charging && pct <= 10) ? Theme.activeRed
          : (laptop && !charging && pct <= 20) ? Theme.warning
