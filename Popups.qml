@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
+import Quickshell.Services.UPower
 import QtQuick.Controls
 
 // All bar popups + their row/section sub-components as flat inline
@@ -2468,6 +2469,136 @@ Item {
                  : Theme.foreground
             renderType: Text.NativeRendering
           }
+        }
+      }
+    }
+  }
+  component BatteryRow: Item {
+    id: root
+    property string icon: ""
+    property string label: ""
+    property int pct: 0
+    property bool charging: false
+
+    width: parent ? parent.width : 260
+    height: 44
+
+    function barColor(p) {
+      if (p <= 15) return Theme.activeRed
+      if (p <= 30) return Theme.warning
+      return Theme.accent
+    }
+
+    Text {
+      id: ic
+      anchors { left: parent.left; top: parent.top; topMargin: 2 }
+      text: root.icon
+      font.family: Theme.font; font.pixelSize: Theme.fontSize + 4
+      color: Theme.foreground; opacity: 0.85
+      renderType: Text.NativeRendering
+    }
+
+    Text {
+      anchors { left: ic.right; leftMargin: 10; top: parent.top; topMargin: 4 }
+      text: root.label
+      font.family: Theme.font; font.pixelSize: Theme.fontSize
+      color: Theme.foreground; opacity: 0.7
+      renderType: Text.NativeRendering
+    }
+
+    Text {
+      anchors { right: parent.right; top: parent.top; topMargin: 4 }
+      text: (root.charging ? Glyphs.charging + " " : "") + root.pct + "%"
+      font.family: Theme.font; font.pixelSize: Theme.fontSize
+      color: root.charging ? Theme.foreground : root.barColor(root.pct)
+      renderType: Text.NativeRendering
+    }
+
+    Rectangle {
+      anchors { left: ic.right; leftMargin: 10; right: parent.right; bottom: parent.bottom; bottomMargin: 6 }
+      height: 4
+      radius: 2
+      color: Qt.rgba(Theme.foreground.r, Theme.foreground.g, Theme.foreground.b, 0.12)
+
+      Rectangle {
+        width: Math.max(4, parent.width * Math.min(root.pct, 100) / 100)
+        height: parent.height
+        radius: 2
+        color: root.barColor(root.pct)
+        Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
+      }
+    }
+  }
+  component BatteryPopup: Item {
+    id: root
+    implicitWidth: col.implicitWidth
+    implicitHeight: col.implicitHeight
+
+    readonly property var ld: UPower.displayDevice
+    readonly property bool hasLaptop: ld && ld.isLaptopBattery
+
+    function iconFor(kind) {
+      return kind === "mouse"    ? Glyphs.mouse
+           : kind === "keyboard" ? Glyphs.keyboard
+           : kind === "earbuds"  ? Glyphs.paHeadphone
+           : kind === "headset"  ? Glyphs.headset
+           : Glyphs.batDefault[5]
+    }
+
+    Column {
+      id: col
+      anchors { left: parent.left; right: parent.right; top: parent.top }
+      spacing: 0
+
+      Item {
+        width: parent.width
+        height: 42
+        Text {
+          anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
+          text: "BATERÍAS"
+          font.family: Theme.font; font.pixelSize: Theme.fontSize + 2
+          color: Theme.foreground; opacity: 0.7
+          renderType: Text.NativeRendering
+        }
+      }
+
+      Column {
+        anchors { left: parent.left; right: parent.right }
+        leftPadding: 14; rightPadding: 14; bottomPadding: 14
+        spacing: 4
+
+        BatteryRow {
+          visible: root.hasLaptop
+          width: parent.width - 28
+          icon: Glyphs.laptop
+          label: "Notebook"
+          pct: root.hasLaptop ? Math.max(0, Math.min(100, Math.round(root.ld.percentage))) : 0
+          charging: root.hasLaptop
+            && (root.ld.state === UPowerDeviceState.Charging
+             || root.ld.state === UPowerDeviceState.PendingCharge
+             || root.ld.state === UPowerDeviceState.FullyCharged)
+        }
+
+        Repeater {
+          model: BatteryState.devs
+          delegate: BatteryRow {
+            required property var modelData
+            width: parent.width - 28
+            icon: root.iconFor(modelData.kind)
+            label: modelData.label
+            pct: modelData.pct
+            charging: modelData.charging
+          }
+        }
+
+        Text {
+          visible: !root.hasLaptop && BatteryState.devs.length === 0
+          width: parent.width - 28
+          text: "Sin dispositivos con batería"
+          font.family: Theme.font; font.pixelSize: Theme.fontSize
+          color: Theme.foreground; opacity: 0.5
+          wrapMode: Text.WordWrap
+          renderType: Text.NativeRendering
         }
       }
     }

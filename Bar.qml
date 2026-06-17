@@ -699,83 +699,49 @@ Item {
       }
     }
   }
-  component Battery: BarButton {
+  // Battery bubble: shows the laptop battery level when there is one, otherwise
+  // a single USB/wireless icon for the peripherals. Either way, hovering opens
+  // the battery popup (Apple-style device list) from BatteryState.
+  component BatteryWidget: BarButton {
     id: root
     pad: 8
-  
+
     readonly property var dev: UPower.displayDevice
-    readonly property bool present: dev && dev.isLaptopBattery
+    readonly property bool laptop: dev && dev.isLaptopBattery
     readonly property int pct: dev ? Math.max(0, Math.min(100, Math.round(dev.percentage))) : 0
     readonly property bool charging: dev
       && (dev.state === UPowerDeviceState.Charging || dev.state === UPowerDeviceState.PendingCharge)
     readonly property bool full: dev
       && (dev.state === UPowerDeviceState.FullyCharged || pct >= 100)
-  
-    readonly property string batIcon: !present ? ""
-      : full ? Glyphs.batFull
+    readonly property string batIcon: full ? Glyphs.batFull
       : (charging ? Glyphs.batCharging : Glyphs.batDefault)[Math.min(9, Math.floor(pct / 10))]
-  
-    text: !present ? "" : (batIcon + "  " + pct + "%")
-  
-    color: (!charging && pct <= 10) ? Theme.activeRed
-         : (!charging && pct <= 20) ? Theme.warning
+
+    readonly property int devCount: BatteryState.devs.length
+
+    // Eagerly touch BatteryState so its poll starts (the popup needs devs).
+    Component.onCompleted: BatteryState.devs
+
+    // Always shown: laptop battery level if there is one, otherwise the USB /
+    // wireless icon for the peripherals (a desktop always has some). Gating on
+    // devCount made the bubble start hidden and never reflow once devs loaded.
+    visible: true
+
+    text: laptop ? (batIcon + "  " + pct + "%") : Glyphs.usb
+
+    color: (laptop && !charging && pct <= 10) ? Theme.activeRed
+         : (laptop && !charging && pct <= 20) ? Theme.warning
          : Theme.foreground
-  
-    tooltipText: {
-      if (!present) return ""
-      var w = dev ? Math.abs(dev.changeRate).toFixed(0) : "0"
-      return (charging ? (w + "W↑ ") : (w + "W↓ ")) + pct + "%"
-    }
-  
-    leftCmd: "omarchy-menu power"
-    rightCmd: "notify-send -u low \"$(omarchy-battery-status)\""
-  }
-  // Per-device battery readout for wireless peripherals (mouse, keyboard,
-  // headset, AirPods…). Data comes from `omarchy-peripheral-batteries`, which
-  // merges UPower, the Compx keyboard HID feature report, and headsetcontrol.
-  component PeripheralBatteries: Row {
-    id: root
-    spacing: 2
-    property var devs: []
 
-    function iconFor(kind) {
-      return kind === "mouse"    ? Glyphs.mouse
-           : kind === "keyboard" ? Glyphs.keyboard
-           : kind === "earbuds"  ? Glyphs.paHeadphone
-           : kind === "headset"  ? Glyphs.paHeadset
-           : Glyphs.batDefault[5]
-    }
+    tooltipText: laptop ? (pct + "%")
+      : (devCount === 1 ? "1 dispositivo" : devCount + " dispositivos")
 
-    Poll {
-      id: poll
-      command: ["omarchy-peripheral-batteries"]
-      interval: 300000
-      onUpdated: (out) => {
-        try { root.devs = JSON.parse(out) }
-        catch (e) { root.devs = [] }
-      }
-    }
-
-    // Refresh on hover (HoverHandler doesn't steal the BarButtons' mouse events,
-    // so per-device tooltips/clicks keep working). poll.run() no-ops if already
-    // running, so this can't pile up.
-    HoverHandler {
-      onHoveredChanged: if (hovered) poll.run()
-    }
-
-    Repeater {
-      model: root.devs
-      delegate: BarButton {
-        required property var modelData
-        pad: 6
-        text: (modelData.charging ? Glyphs.charging + " " : "")
-            + root.iconFor(modelData.kind) + "  " + modelData.pct + "%"
-        color: modelData.charging ? Theme.foreground
-             : modelData.pct <= 10 ? Theme.activeRed
-             : modelData.pct <= 20 ? Theme.warning
-             : Theme.foreground
-        tooltipText: modelData.label + ": " + modelData.pct + "%"
-            + (modelData.charging ? " (cargando)" : "")
+    onHoveredChanged: {
+      if (hovered) {
+        BatteryState.anchorX = root.mapToItem(null, 0, 0).x
+        BatteryState.anchorW = root.width
+        BatteryState.show()
+      } else {
+        BatteryState.hide()
       }
     }
   }
@@ -873,8 +839,7 @@ Item {
     Bubble { Bluetooth {} }
     Bubble { Network {} }
     Bubble { SysInfo {} }
-    Bubble { PeripheralBatteries {} }
-    Bubble { Battery {} }
+    Bubble { BatteryWidget {} }
   }
 }
 
