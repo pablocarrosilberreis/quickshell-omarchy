@@ -167,9 +167,52 @@ def headsetcontrol_devices():
     return res
 
 
+# ── Solaar (live HID++ query for Logitech devices) ───────────────────────────
+# The kernel/UPower only update the hidpp battery when the device *pushes* an
+# event, so a charging mouse can sit frozen for ages. `solaar show` actively
+# queries the device, giving a fresh level — so it takes priority for any kind
+# it reports.
+def solaar_devices():
+    if not shutil.which("solaar"):
+        return []
+    try:
+        out = subprocess.run(["solaar", "show"], capture_output=True,
+                             text=True, timeout=20).stdout
+    except Exception:
+        return []
+    res = []
+    name = None
+    kind = None
+    seen_names = set()
+    for line in out.splitlines():
+        if line and not line[0].isspace():
+            name, kind = line.strip(), None
+            continue
+        m = re.match(r"\s*Kind\s*:\s*(\w+)", line)
+        if m:
+            kind = m.group(1).lower()
+            continue
+        m = re.search(r"Battery:\s*(\d+)%,\s*(?:BatteryStatus\.)?(\w+)", line)
+        if m and name and name not in seen_names:
+            seen_names.add(name)
+            pct = int(m.group(1))
+            status = m.group(2).upper()
+            k = {"mouse": "mouse", "keyboard": "keyboard",
+                 "headset": "headset", "headphones": "headset",
+                 "touchpad": "mouse"}.get(kind, "other")
+            label = {"mouse": "Mouse", "keyboard": "Teclado"}.get(k, name)
+            res.append({"kind": k, "label": label, "pct": pct,
+                        "charging": "CHARG" in status})
+    return res
+
+
 def main():
     devs = []
-    devs.extend(upower_devices())
+    solaar = solaar_devices()
+    devs.extend(solaar)
+    # Solaar (live) wins over UPower (cached) for any kind it already covers.
+    solaar_kinds = {d["kind"] for d in solaar}
+    devs.extend(d for d in upower_devices() if d["kind"] not in solaar_kinds)
     kb = compx_keyboard()
     if kb:
         devs.append(kb)

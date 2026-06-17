@@ -51,7 +51,12 @@ if [ -f "$REPO_DIR/udev/99-compx-kb-battery.rules" ]; then
   fi
 fi
 
-# Optional: gaming-headset battery (HyperX, etc.) via headsetcontrol.
+# Optional battery-readout helpers for omarchy-peripheral-batteries:
+#  - solaar: live HID++ query for Logitech devices (the kernel/UPower value
+#    freezes while charging; solaar gives a fresh level and takes priority).
+#  - headsetcontrol: gaming-headset battery (HyperX, etc.).
+command -v solaar &>/dev/null || \
+  echo "==> (optional) install 'solaar' for live Logitech mouse/keyboard battery"
 command -v headsetcontrol &>/dev/null || \
   echo "==> (optional) install 'headsetcontrol' for headset battery readout"
 

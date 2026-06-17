@@ -748,7 +748,7 @@ Item {
 
     Poll {
       command: ["omarchy-peripheral-batteries"]
-      interval: 30000
+      interval: 60000
       onUpdated: (out) => {
         try { root.devs = JSON.parse(out) }
         catch (e) { root.devs = [] }
