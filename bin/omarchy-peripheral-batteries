@@ -3,17 +3,20 @@
 the bar cares about: keyboard, mouse, headset, earbuds (AirPods), etc.
 
 Sources, in order of how the data is obtained:
-  - UPower      : mouse (Logitech PRO X 2, via hidpp), AirPods & any BT device
-                  that exposes a battery when connected. Deduped by serial.
-  - HID feature : keyboard (Compx 2.4G receiver 3554:FA09). The receiver does
-                  NOT expose a standard HID battery, but feature report 0x06
-                  carries the level in byte index 3 (validated by hand). Needs
-                  read access to its /dev/hidrawN (see 99-compx-kb-battery.rules).
-  - headsetcontrol : HyperX / other gaming headsets, if the tool is installed
-                  and supports the model.
-
-UPower's hidpp driver mislabels the PRO X 2 mouse as "keyboard", so device
-KIND is decided by model name here, not by the reported kind.
+  - Solaar      : live HID++ query for Logitech devices (mouse). Authoritative
+                  over UPower, whose cached hidpp value freezes for ages.
+  - UPower      : AirPods & any BT device that exposes a battery. Deduped by
+                  serial. (UPower's hidpp value is only used when Solaar is
+                  absent; its driver also mislabels the mouse kind, so KIND is
+                  decided by model name here, not by the reported kind.)
+  - HID feature : Aula F75 keyboard (Compx 2.4G receiver 3554:FA09). No standard
+                  HID battery, but feature report 0x06 byte 3 holds the level
+                  (validated against the keyboard's FN+B indicator). Needs hidraw
+                  access (see 99-compx-kb-battery.rules).
+  - headsetcontrol : gaming headsets the tool supports.
+  - HID vendor  : HyperX Cloud III S Wireless (03f0:06be), queried over its
+                  vendor protocol since headsetcontrol can't see it. Needs hidraw
+                  access (see 99-hyperx-headset-battery.rules).
 
 Output (one line, sorted): [{"kind","label","pct","charging"}, ...]
 Empty array when nothing reports a battery.
@@ -245,9 +248,13 @@ def hyperx_headset():
                     data = os.read(fd, 64)
                 except OSError:
                     break
-                if len(data) > 6 and 1 <= data[6] <= 100:
-                    return {"kind": "headset", "label": "HyperX",
-                            "pct": data[6], "charging": False}
+                # Our reply echoes the request header; ignore unrelated reports.
+                if len(data) >= 7 and data[:6] == cmd[:6]:
+                    bat = data[6]   # 0xff (>100) when the headset is off
+                    if 1 <= bat <= 100:
+                        return {"kind": "headset", "label": "HyperX",
+                                "pct": bat, "charging": False}
+                    return None     # got our reply, headset is off → done
             return None
         except OSError:
             return None
