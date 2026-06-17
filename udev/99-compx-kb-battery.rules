@@ -1,0 +1,6 @@
+# Grant non-root read access to the Compx 2.4G wireless receiver (keyboard),
+# so `omarchy-peripheral-batteries` can read its HID feature report 0x06 (the
+# battery level). The receiver does not expose a standard HID battery, so the
+# kernel never creates a power_supply for it and udev's default hidraw perms
+# are root-only.
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3554", ATTRS{idProduct}=="fa09", MODE="0660", GROUP="input", TAG+="uaccess"

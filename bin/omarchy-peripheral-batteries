@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Emit a single compact JSON line with the battery level of every peripheral
+the bar cares about: keyboard, mouse, headset, earbuds (AirPods), etc.
+
+Sources, in order of how the data is obtained:
+  - UPower      : mouse (Logitech PRO X 2, via hidpp), AirPods & any BT device
+                  that exposes a battery when connected. Deduped by serial.
+  - HID feature : keyboard (Compx 2.4G receiver 3554:FA09). The receiver does
+                  NOT expose a standard HID battery, but feature report 0x06
+                  carries the level in byte index 3 (validated by hand). Needs
+                  read access to its /dev/hidrawN (see 99-compx-kb-battery.rules).
+  - headsetcontrol : HyperX / other gaming headsets, if the tool is installed
+                  and supports the model.
+
+UPower's hidpp driver mislabels the PRO X 2 mouse as "keyboard", so device
+KIND is decided by model name here, not by the reported kind.
+
+Output (one line, sorted): [{"kind","label","pct","charging"}, ...]
+Empty array when nothing reports a battery.
+"""
+
+import json
+import os
+import re
+import glob
+import fcntl
+import shutil
+import subprocess
+
+# ── classification ──────────────────────────────────────────────────────────
+# (substring matched against the UPower model, case-insensitive) -> (kind, label)
+MODEL_MAP = [
+    ("pro x 2",  ("mouse",   "Mouse")),
+    ("airpods",  ("earbuds", "AirPods")),
+    ("hyperx",   ("headset", "HyperX")),
+]
+# bar ordering
+KIND_ORDER = {"keyboard": 0, "mouse": 1, "headset": 2, "earbuds": 3, "other": 9}
+
+
+def run(cmd, timeout=5):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=timeout).stdout
+    except Exception:
+        return ""
+
+
+def classify(model, kind_hint):
+    low = (model or "").lower()
+    for needle, res in MODEL_MAP:
+        if needle in low:
+            return res
+    if kind_hint in ("mouse", "keyboard", "headset", "headphones"):
+        return ("headset" if kind_hint == "headphones" else kind_hint,
+                model or kind_hint.title())
+    return ("other", model or "Battery")
+
+
+# ── UPower (mouse, AirPods, generic BT batteries) ─────────────────────────────
+def upower_devices():
+    paths = run(["upower", "-e"]).split()
+    by_serial = {}
+    out = []
+    for path in paths:
+        if "DisplayDevice" in path or "line_power" in path:
+            continue
+        info = run(["upower", "-i", path])
+        if not info:
+            continue
+        fields = {}
+        kind_hint = None
+        for line in info.splitlines():
+            m = re.match(r"\s*([a-z][\w-]*):\s+(.*)", line)
+            if m:
+                fields[m.group(1)] = m.group(2).strip()
+            else:
+                w = line.strip()
+                if w in ("keyboard", "mouse", "headset", "headphones",
+                         "battery", "phone", "gaming-input", "pen", "touchpad"):
+                    kind_hint = w
+        if fields.get("present", "yes") == "no":
+            continue
+        pct_raw = fields.get("percentage", "")
+        if "should be ignored" in pct_raw:
+            continue
+        m = re.match(r"(\d+)", pct_raw)
+        if not m:
+            continue
+        pct = int(m.group(1))
+        state = fields.get("state", "").lower()
+        if state == "unknown":
+            continue
+        charging = state in ("charging", "pending-charge", "fully-charged")
+        model = fields.get("model", "")
+        kind, label = classify(model, kind_hint)
+        entry = {"kind": kind, "label": label, "pct": pct, "charging": charging}
+        # dedupe by serial: the PRO X 2 shows up via both its dongle and USB.
+        serial = fields.get("serial") or path
+        prev = by_serial.get(serial)
+        if prev is None or (charging and not prev["charging"]):
+            by_serial[serial] = entry
+    out.extend(by_serial.values())
+    return out
+
+
+# ── Keyboard: Compx 2.4G receiver feature report 0x06 ────────────────────────
+def _ioc(d, t, nr, sz):
+    return (d << 30) | (sz << 16) | (ord(t) << 8) | nr
+
+
+def _hidiocgfeature(sz):
+    return _ioc(3, "H", 0x07, sz)  # _IOC(WRITE|READ, 'H', 7, len)
+
+
+def compx_keyboard():
+    for hr in glob.glob("/sys/class/hidraw/hidraw*"):
+        try:
+            uevent = open(os.path.join(hr, "device", "uevent")).read().upper()
+        except OSError:
+            continue
+        if "3554" not in uevent or "FA09" not in uevent:
+            continue
+        dev = "/dev/" + os.path.basename(hr)
+        try:
+            fd = os.open(dev, os.O_RDWR)
+        except OSError:
+            continue
+        try:
+            buf = bytearray(8)
+            buf[0] = 0x06
+            fcntl.ioctl(fd, _hidiocgfeature(8), buf, True)
+            if buf[0] == 0x06:
+                pct = buf[3]
+                if 0 <= pct <= 100:
+                    return {"kind": "keyboard", "label": "Teclado",
+                            "pct": pct, "charging": False}
+        except OSError:
+            pass
+        finally:
+            os.close(fd)
+    return None
+
+
+# ── headsetcontrol (HyperX & friends) ────────────────────────────────────────
+def headsetcontrol_devices():
+    if not shutil.which("headsetcontrol"):
+        return []
+    out = run(["headsetcontrol", "-o", "json"])
+    if not out:
+        return []
+    try:
+        data = json.loads(out)
+    except ValueError:
+        return []
+    res = []
+    for dev in data.get("devices", []):
+        bat = dev.get("battery", {})
+        if bat.get("status") != "BATTERY_AVAILABLE":
+            continue
+        lvl = bat.get("level")
+        if not isinstance(lvl, int) or not (0 <= lvl <= 100):
+            continue
+        name = dev.get("product") or dev.get("device") or "Headset"
+        res.append({"kind": "headset", "label": name, "pct": lvl,
+                    "charging": False})
+    return res
+
+
+def main():
+    devs = []
+    devs.extend(upower_devices())
+    kb = compx_keyboard()
+    if kb:
+        devs.append(kb)
+    devs.extend(headsetcontrol_devices())
+
+    # collapse duplicate kinds (e.g. headset from both UPower and headsetcontrol)
+    seen = {}
+    for d in devs:
+        key = (d["kind"], d["label"])
+        if key not in seen:
+            seen[key] = d
+    devs = list(seen.values())
+
+    devs.sort(key=lambda d: (KIND_ORDER.get(d["kind"], 9), d["label"]))
+    print(json.dumps(devs, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    main()

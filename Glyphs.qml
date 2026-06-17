@@ -48,6 +48,11 @@ Singleton {
   readonly property string mediaPrev:     "󰒮"
   readonly property string mediaNext:     "󰒭"
 
+  // peripherals (nf-md-mouse, nf-md-keyboard) — for per-device battery readout
+  readonly property string mouse: "󰍽"
+  readonly property string keyboard: "󰌌"
+  readonly property string charging: "󰉁"
+
   // battery
   readonly property string batFull: "󰂅"
   readonly property var batCharging: ["󰢜", "󰂆", "󰂇", "󰂈", "󰢝", "󰂉", "󰢞", "󰂊", "󰂋", "󰂅"]

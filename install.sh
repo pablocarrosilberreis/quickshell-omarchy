@@ -42,6 +42,19 @@ if [ -d "$REPO_DIR/bin" ]; then
   chmod +x "$BIN_DIR"/omarchy-* 2>/dev/null || true
 fi
 
+# udev rule so the peripheral-battery readout can read the Compx keyboard
+# receiver's HID feature report without root. Needs sudo; skipped if absent.
+if [ -f "$REPO_DIR/udev/99-compx-kb-battery.rules" ]; then
+  echo "==> Installing udev rule for keyboard battery (sudo)"
+  if sudo cp "$REPO_DIR/udev/99-compx-kb-battery.rules" /etc/udev/rules.d/; then
+    sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw
+  fi
+fi
+
+# Optional: gaming-headset battery (HyperX, etc.) via headsetcontrol.
+command -v headsetcontrol &>/dev/null || \
+  echo "==> (optional) install 'headsetcontrol' for headset battery readout"
+
 cat > "$BIN_DIR/omarchy-toggle-quickshell" <<'EOF'
 #!/bin/bash
 # omarchy:summary=Toggle the QuickShell bar visibility

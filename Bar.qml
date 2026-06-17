@@ -730,6 +730,47 @@ Item {
     leftCmd: "omarchy-menu power"
     rightCmd: "notify-send -u low \"$(omarchy-battery-status)\""
   }
+  // Per-device battery readout for wireless peripherals (mouse, keyboard,
+  // headset, AirPods…). Data comes from `omarchy-peripheral-batteries`, which
+  // merges UPower, the Compx keyboard HID feature report, and headsetcontrol.
+  component PeripheralBatteries: Row {
+    id: root
+    spacing: 2
+    property var devs: []
+
+    function iconFor(kind) {
+      return kind === "mouse"    ? Glyphs.mouse
+           : kind === "keyboard" ? Glyphs.keyboard
+           : kind === "earbuds"  ? Glyphs.paHeadphone
+           : kind === "headset"  ? Glyphs.paHeadset
+           : Glyphs.batDefault[5]
+    }
+
+    Poll {
+      command: ["omarchy-peripheral-batteries"]
+      interval: 30000
+      onUpdated: (out) => {
+        try { root.devs = JSON.parse(out) }
+        catch (e) { root.devs = [] }
+      }
+    }
+
+    Repeater {
+      model: root.devs
+      delegate: BarButton {
+        required property var modelData
+        pad: 6
+        text: (modelData.charging ? Glyphs.charging + " " : "")
+            + root.iconFor(modelData.kind) + "  " + modelData.pct + "%"
+        color: modelData.charging ? Theme.foreground
+             : modelData.pct <= 10 ? Theme.activeRed
+             : modelData.pct <= 20 ? Theme.warning
+             : Theme.foreground
+        tooltipText: modelData.label + ": " + modelData.pct + "%"
+            + (modelData.charging ? " (cargando)" : "")
+      }
+    }
+  }
   component Bubble: Item {
     id: root
     default property alias contents: inner.data
@@ -824,6 +865,7 @@ Item {
     Bubble { Bluetooth {} }
     Bubble { Network {} }
     Bubble { SysInfo {} }
+    Bubble { PeripheralBatteries {} }
     Bubble { Battery {} }
   }
 }
