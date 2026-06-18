@@ -2473,61 +2473,89 @@ Item {
       }
     }
   }
-  component BatteryRow: Item {
-    id: root
+  // Apple-style circular battery gauge: progress ring + device icon + a
+  // charging bolt on the ring, the percentage below.
+  component BatteryGauge: Item {
+    id: g
     property string icon: ""
-    property string label: ""
     property int pct: 0
     property bool charging: false
 
-    width: parent ? parent.width : 260
-    height: 44
+    width: 86
+    height: 104
 
-    function barColor(p) {
+    function arcColor(p) {
       if (p <= 15) return Theme.activeRed
       if (p <= 30) return Theme.warning
       return Theme.accent
     }
 
-    Text {
-      id: ic
-      anchors { left: parent.left; top: parent.top; topMargin: 2 }
-      text: root.icon
-      font.family: Theme.font; font.pixelSize: Theme.fontSize + 4
-      color: Theme.foreground; opacity: 0.85
-      renderType: Text.NativeRendering
-    }
+    Item {
+      id: ring
+      width: 64; height: 64
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: parent.top
+      anchors.topMargin: 6
 
-    Text {
-      anchors { left: ic.right; leftMargin: 10; top: parent.top; topMargin: 4 }
-      text: root.label
-      font.family: Theme.font; font.pixelSize: Theme.fontSize
-      color: Theme.foreground; opacity: 0.7
-      renderType: Text.NativeRendering
-    }
+      Canvas {
+        id: canvas
+        anchors.fill: parent
+        readonly property real lw: 6
+        readonly property color trackC:
+          Qt.rgba(Theme.foreground.r, Theme.foreground.g, Theme.foreground.b, 0.16)
+        readonly property color arcC: g.arcColor(g.pct)
+        antialiasing: true
+        onPaint: {
+          var ctx = getContext("2d"); ctx.reset()
+          var cx = width / 2, cy = height / 2, r = width / 2 - lw / 2 - 1
+          ctx.lineWidth = lw; ctx.lineCap = "round"
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+          ctx.strokeStyle = trackC; ctx.stroke()
+          if (g.pct > 0) {
+            var start = -Math.PI / 2
+            var end = start + 2 * Math.PI * Math.min(g.pct, 100) / 100
+            ctx.beginPath(); ctx.arc(cx, cy, r, start, end)
+            ctx.strokeStyle = arcC; ctx.stroke()
+          }
+        }
+        onArcCChanged: requestPaint()
+        onTrackCChanged: requestPaint()
+        Component.onCompleted: requestPaint()
+      }
 
-    Text {
-      anchors { right: parent.right; top: parent.top; topMargin: 4 }
-      text: (root.charging ? Glyphs.charging + " " : "") + root.pct + "%"
-      font.family: Theme.font; font.pixelSize: Theme.fontSize
-      color: root.charging ? Theme.foreground : root.barColor(root.pct)
-      renderType: Text.NativeRendering
-    }
+      // Device icon centered in the ring.
+      Text {
+        anchors.centerIn: parent
+        text: g.icon
+        font.pixelSize: 26
+        color: Theme.foreground
+        renderType: Text.NativeRendering
+      }
 
-    Rectangle {
-      anchors { left: ic.right; leftMargin: 10; right: parent.right; bottom: parent.bottom; bottomMargin: 6 }
-      height: 4
-      radius: 2
-      color: Qt.rgba(Theme.foreground.r, Theme.foreground.g, Theme.foreground.b, 0.12)
-
-      Rectangle {
-        width: Math.max(4, parent.width * Math.min(root.pct, 100) / 100)
-        height: parent.height
-        radius: 2
-        color: root.barColor(root.pct)
-        Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
+      // Charging bolt sitting on the top of the ring.
+      Text {
+        visible: g.charging
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: -7
+        text: Glyphs.charging
+        font.pixelSize: 15
+        color: Theme.foreground
+        renderType: Text.NativeRendering
       }
     }
+
+    Text {
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.bottom: parent.bottom
+      anchors.bottomMargin: 2
+      text: g.pct + "%"
+      font.family: Theme.font; font.pixelSize: 19
+      color: Theme.foreground
+      renderType: Text.NativeRendering
+    }
+
+    onPctChanged: canvas.requestPaint()
   }
   component BatteryPopup: Item {
     id: root
@@ -2547,31 +2575,17 @@ Item {
 
     Column {
       id: col
-      anchors { left: parent.left; right: parent.right; top: parent.top }
-      spacing: 0
+      padding: 16
+      spacing: 6
 
-      Item {
-        width: parent.width
-        height: 42
-        Text {
-          anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
-          text: "BATERÍAS"
-          font.family: Theme.font; font.pixelSize: Theme.fontSize + 2
-          color: Theme.foreground; opacity: 0.7
-          renderType: Text.NativeRendering
-        }
-      }
+      Row {
+        id: gauges
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 10
 
-      Column {
-        anchors { left: parent.left; right: parent.right }
-        leftPadding: 14; rightPadding: 14; bottomPadding: 14
-        spacing: 4
-
-        BatteryRow {
+        BatteryGauge {
           visible: root.hasLaptop
-          width: parent.width - 28
           icon: Glyphs.laptop
-          label: "Notebook"
           pct: root.hasLaptop ? Math.max(0, Math.min(100, Math.round(root.ld.percentage))) : 0
           charging: root.hasLaptop
             && (root.ld.state === UPowerDeviceState.Charging
@@ -2581,25 +2595,22 @@ Item {
 
         Repeater {
           model: BatteryState.devs
-          delegate: BatteryRow {
+          delegate: BatteryGauge {
             required property var modelData
-            width: parent.width - 28
             icon: root.iconFor(modelData.kind)
-            label: modelData.label
             pct: modelData.pct
             charging: modelData.charging
           }
         }
+      }
 
-        Text {
-          visible: !root.hasLaptop && BatteryState.devs.length === 0
-          width: parent.width - 28
-          text: "Sin dispositivos con batería"
-          font.family: Theme.font; font.pixelSize: Theme.fontSize
-          color: Theme.foreground; opacity: 0.5
-          wrapMode: Text.WordWrap
-          renderType: Text.NativeRendering
-        }
+      Text {
+        visible: !root.hasLaptop && BatteryState.devs.length === 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: "Sin dispositivos con batería"
+        font.family: Theme.font; font.pixelSize: Theme.fontSize
+        color: Theme.foreground; opacity: 0.5
+        renderType: Text.NativeRendering
       }
     }
   }

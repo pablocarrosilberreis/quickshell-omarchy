@@ -541,12 +541,12 @@ ShellRoot {
             BatteryState.anchorX + BatteryState.anchorW / 2 - width / 2,
             modelData.width - width - 4))
           y: Theme.popupGap
-          width: 300
-          implicitHeight: batContent.implicitHeight + 10
+          width: batContent.implicitWidth
+          implicitHeight: batContent.implicitHeight
 
           Popups.BatteryPopup {
             id: batContent
-            anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 5 }
+            anchors { top: parent.top; horizontalCenter: parent.horizontalCenter }
           }
 
           HoverHandler {
