@@ -21,8 +21,21 @@ ShellRoot {
     property bool _closing: false
   
     radius: Theme.windowRadius
-    color: Qt.darker(Theme.background, 1.8)
-  
+    color: Theme.glassStrong
+    border.width: 1
+    border.color: Theme.glassBorder
+
+    // Specular top sheen — the bright glass edge (behind the popup content,
+    // which is appended as later children).
+    Rectangle {
+      anchors.fill: parent
+      radius: parent.radius
+      gradient: Gradient {
+        GradientStop { position: 0.0; color: Theme.glassHighlight }
+        GradientStop { position: 0.5; color: "transparent" }
+      }
+    }
+
     // Hidden resting state; grow from the top edge.
     opacity: 0
     scale: 0.9

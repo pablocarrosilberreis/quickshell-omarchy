@@ -109,11 +109,11 @@ Item {
       anchors.fill: parent
       implicitWidth: label.implicitWidth + 14
       implicitHeight: label.implicitHeight + 8
-      color: Theme.background
-      border.color: Theme.accent
+      color: Theme.glassStrong
+      border.color: Theme.glassBorder
       border.width: 1
-      radius: 4
-  
+      radius: 8
+
       Text {
         id: label
         anchors.centerIn: parent
@@ -760,9 +760,21 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       height: parent.height - 6
       radius: height / 2
-      color: Qt.darker(Theme.background, 1.8)
+      color: Theme.glass
+      border.width: 1
+      border.color: Theme.glassBorder
+
+      // Specular top sheen — the bright glass edge of Apple's liquid glass.
+      Rectangle {
+        anchors.fill: parent
+        radius: parent.radius
+        gradient: Gradient {
+          GradientStop { position: 0.0; color: Theme.glassHighlight }
+          GradientStop { position: 0.55; color: "transparent" }
+        }
+      }
     }
-  
+
     Row {
       id: inner
       anchors.centerIn: parent

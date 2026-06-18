@@ -22,6 +22,22 @@ Singleton {
   // Battery warning tint (<=20%, discharging).
   readonly property color warning: "#cc8844"
 
+  // ── Liquid-glass surfaces ───────────────────────────────────────────────
+  // Translucent fills so the Hyprland layer blur shows through as frosted
+  // glass, with a bright edge highlight. All derived from the theme palette,
+  // so they re-tint on theme change. (Tune `glassAlpha` for more/less frost.)
+  readonly property real glassAlpha: 0.52
+  readonly property color glass:
+    Qt.rgba(background.r, background.g, background.b, glassAlpha)
+  // Slightly more opaque for popups (more text over busier blur).
+  readonly property color glassStrong:
+    Qt.rgba(background.r, background.g, background.b, Math.min(1, glassAlpha + 0.12))
+  readonly property color glassBorder:
+    Qt.rgba(foreground.r, foreground.g, foreground.b, 0.22)
+  // Top specular highlight line, like Apple's glass edge.
+  readonly property color glassHighlight:
+    Qt.rgba(foreground.r, foreground.g, foreground.b, 0.10)
+
   readonly property string font: "JetBrainsMono Nerd Font"
   readonly property int fontSize: 12
   readonly property int barHeight: 26
