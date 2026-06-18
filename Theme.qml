@@ -42,9 +42,8 @@ Singleton {
   readonly property int fontSize: 12
   readonly property int barHeight: 26
 
-  // Corner rounding for popup/menu frames, kept in sync with Omarchy's
-  // Hyprland window rounding (decoration:rounding in ~/.config/hypr/looknfeel.lua).
-  readonly property int windowRadius: 8
+  // Corner rounding for popup/menu frames — generous, Apple-panel style.
+  readonly property int windowRadius: 16
 
   // Vertical gap between the bar and popups/toasts anchored below it.
   readonly property int popupGap: 10

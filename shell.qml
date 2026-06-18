@@ -38,9 +38,9 @@ ShellRoot {
 
     // Hidden resting state; grow from the top edge.
     opacity: 0
-    scale: 0.9
+    scale: 0.88
     transformOrigin: Item.Top
-    property real _slideY: -8
+    property real _slideY: -12
     transform: Translate { y: root._slideY }
   
     // If created while already visible (e.g. a stacked-toast Repeater delegate),
@@ -61,23 +61,29 @@ ShellRoot {
       }
     }
   
-    // Open: fade in, slide down, and a soft spring-scale with a small overshoot.
+    // Open: quick fade while the panel springs up from the anchor with a soft
+    // settle — like macOS Control Center. The fade finishes well before the
+    // spring so the overshoot reads as motion, not opacity.
     ParallelAnimation {
       id: enterAnim
-      NumberAnimation { target: root; property: "opacity"; from: 0;    to: 1; duration: 160; easing.type: Easing.OutCubic }
-      NumberAnimation { target: root; property: "_slideY"; from: -8;   to: 0; duration: 220; easing.type: Easing.OutCubic }
+      NumberAnimation { target: root; property: "opacity"; from: 0;    to: 1; duration: 180; easing.type: Easing.OutCubic }
       NumberAnimation {
-        target: root; property: "scale"; from: 0.9; to: 1
-        duration: 300; easing.type: Easing.OutBack; easing.overshoot: 1.1
+        target: root; property: "_slideY"; from: -12; to: 0
+        duration: 440; easing.type: Easing.OutBack; easing.overshoot: 1.05
+      }
+      NumberAnimation {
+        target: root; property: "scale"; from: 0.88; to: 1
+        duration: 460; easing.type: Easing.OutBack; easing.overshoot: 1.2
       }
     }
-  
-    // Close: quick fade + shrink, then release the window.
+
+    // Close: a touch slower than a snap, fading and easing back toward the
+    // anchor (no bounce on the way out).
     ParallelAnimation {
       id: exitAnim
-      NumberAnimation { target: root; property: "opacity"; to: 0;    duration: 130; easing.type: Easing.InCubic }
-      NumberAnimation { target: root; property: "_slideY"; to: -6;   duration: 130; easing.type: Easing.InCubic }
-      NumberAnimation { target: root; property: "scale";   to: 0.94; duration: 130; easing.type: Easing.InCubic }
+      NumberAnimation { target: root; property: "opacity"; to: 0;     duration: 190; easing.type: Easing.InCubic }
+      NumberAnimation { target: root; property: "_slideY"; to: -10;   duration: 210; easing.type: Easing.OutCubic }
+      NumberAnimation { target: root; property: "scale";   to: 0.92;  duration: 210; easing.type: Easing.OutCubic }
       onFinished: root._closing = false
     }
   }
