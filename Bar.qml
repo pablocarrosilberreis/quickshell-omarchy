@@ -415,7 +415,10 @@ Item {
     }
   
     Poll {
-      interval: 60000
+      // 15 min: weather changes slowly, and each call hits wttr.in twice
+      // (icon + temp). Polling every 60s got the IP rate-limited, which made
+      // both the bar and the forecast popup fall back to stale cache.
+      interval: 900000
       command: ["omarchy-weather-bar"]
       onUpdated: (out) => {
         try { root.weatherText = JSON.parse(out).text || "" }

@@ -26,7 +26,7 @@ Singleton {
   // Translucent fills so the Hyprland layer blur shows through as frosted
   // glass, with a bright edge highlight. All derived from the theme palette,
   // so they re-tint on theme change. (Tune `glassAlpha` for more/less frost.)
-  readonly property real glassAlpha: 0.52
+  readonly property real glassAlpha: 0.68
   readonly property color glass:
     Qt.rgba(background.r, background.g, background.b, glassAlpha)
   // Slightly more opaque for popups (more text over busier blur).
