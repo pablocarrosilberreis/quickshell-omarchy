@@ -8,8 +8,10 @@ pactl --format=json list sinks   >"$sinks_file"   2>/dev/null &
 pactl --format=json list sources >"$sources_file" 2>/dev/null &
 wait
 
+# zen_sink is the virtual sink for Zen's audio (see Zen slider in the bar),
+# not a real output — keep it out of the device picker.
 sinks=$(jq -c --arg d "$ds" \
-  '[.[]|{name:.name,desc:.description,active:(.name==$d)}]' "$sinks_file")
+  '[.[]|select(.name!="zen_sink")|{name:.name,desc:.description,active:(.name==$d)}]' "$sinks_file")
 sources=$(jq -c --arg d "$di" \
   '[.[]|select(.name|test("\\.monitor$")|not)|{name:.name,desc:.description,active:(.name==$d)}]' \
   "$sources_file")
